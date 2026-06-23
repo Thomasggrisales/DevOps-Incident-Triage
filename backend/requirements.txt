@@ -1,20 +1,20 @@
-# --- FRAMEWORK WEB ---
+# FRAMEWORK WEB 
 fastapi==0.110.0
 uvicorn==0.27.1
 
-# --- IA Y ORQUESTACIÓN (LANGCHAIN) ---
+# IA Y ORQUESTACIÓN 
 langchain==0.1.12
 langchain-openai==0.0.8
 langchain-community==0.0.28
 langchain-core==0.1.33
 
-# --- BASE DE DATOS VECTORIAL ---
+# BASE DE DATOS VECTORIAL 
 weaviate-client==4.5.4
 
-# --- UTILIDADES ---
+# UTILIDADES 
 python-dotenv==1.0.1
 pydantic==2.6.3
 pydantic-settings==2.2.1
 
-# --- BASE DE DATOS RELACIONAL (OPCIONAL PARA USUARIOS/PROYECTOS) ---
+# BASE DE DATOS RELACIONAL 
 sqlalchemy==2.0.28
