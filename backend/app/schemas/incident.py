@@ -1,23 +1,37 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel
 from datetime import datetime
+from typing import List, Optional
 
-# Esquema base con los campos requeridos
-class IncidentBase(BaseModel):
-    title: str = Field(..., description="Título del incidente", example="Alta latencia en Microservicio de Autenticación")
-    description: str = Field(..., description="Detalle de los logs o métricas", example="Latencia por encima del umbral de 500ms durante 5 minutos")
-    source: str = Field(..., description="Origen de la alerta (ej. Prometheus, Datadog)", example="Prometheus/Alertmanager")
-    severity: str = Field(..., description="Severidad del incidente (P0, P1, P2)", example="P1")
-
-# Esquema para cuando se crea un incidente (Input)
-class IncidentCreate(IncidentBase):
-    pass
-
-# Esquema para cuando devolvemos el incidente (Output)
-class IncidentResponse(IncidentBase):
+# --- ESQUEMAS PARA HISTORIAL ---
+class StatusHistoryResponse(BaseModel):
     id: int
-    status: str  # open, investigating, resolved
+    old_status: Optional[str] = None
+    new_status: str
+    changed_at: datetime
+    changed_by: str
+
+    class Config:
+        from_attributes = True
+
+
+# --- ESQUEMAS PARA INCIDENTES ---
+class IncidentCreate(BaseModel):
+    title: str
+    description: str
+    source: str
+    severity: str
+
+class IncidentUpdateStatus(BaseModel):
+    status: str
+    # Opcional: Podrías pedir el usuario que hace el cambio
+    # changed_by: str = "System_AI" 
+
+class IncidentResponse(IncidentCreate):
+    id: int
+    status: str
     created_at: datetime
+    # Descomenta la siguiente línea si quieres que la API devuelva el historial de cambios de una vez
+    # history: List[StatusHistoryResponse] = []
 
     class Config:
         from_attributes = True

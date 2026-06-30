@@ -1,5 +1,11 @@
 from fastapi import FastAPI
-from app.api.incidents import router as incidents_router
+from fastapi.middleware.cors import CORSMiddleware
+from app.db.database import engine
+from app.db import models
+from app.api.incidents import router as incident_router
+
+# Crear las tablas en la BD
+models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="DevOps Incident Triage API",
@@ -7,23 +13,21 @@ app = FastAPI(
     version="0.1.0"
 )
 
-# Ticket #1: Endpoint explícito de Health Check
-@app.get("/health", tags=["System"])
-def health_check():
-    """
-    Verifica si la API está viva y respondiendo.
-    """
-    return {
-        "status": "ok", 
-        "message": "¡El servidor base está vivo y respondiendo correctamente!"
-    }
+# Incluimos el router. Aquí ponemos el PREFIJO.
+app.include_router(
+    incident_router, 
+    prefix="/incidents", 
+    tags=["Incidents"]
+)
 
-# Endpoint raíz informativo
 @app.get("/")
 def read_root():
-    return {
-        "message": "Bienvenido a DevOps Incident Triage API. Visita /docs para probar los endpoints."
-    }
+    return {"status": "ok", "message": "¡La API está funcionando perfectamente!"}
 
-# Ticket #3: Conectamos las rutas de incidentes al archivo principal
-app.include_router(incidents_router)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)

@@ -18,3 +18,4 @@ pydantic-settings==2.2.1
 
 # BASE DE DATOS RELACIONAL 
 sqlalchemy==2.0.28
+psycopg2-binary==2.9.9
