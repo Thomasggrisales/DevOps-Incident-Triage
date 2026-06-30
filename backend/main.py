@@ -9,7 +9,8 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(
     title="DevOps Incident Triage API",
-    description="API para el sistema de gestión de incidentes"
+    description="API para el sistema de gestión de incidentes",
+    version="0.1.0"
 )
 
 # Incluimos el router. Aquí ponemos el PREFIJO.
