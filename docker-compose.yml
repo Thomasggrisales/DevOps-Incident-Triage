@@ -7,8 +7,10 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Esto sincroniza tu código local con el contenedor para que veas los cambios en vivo (Hot Reload)
+      # Sincroniza tu código local con el contenedor
       - ./backend:/app
+    # Le dice a Docker exactamente cómo arrancar tu main.py real con Hot Reload activo
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     environment:
       - PYTHONUNBUFFERED=1
 
@@ -19,5 +21,5 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      # Esta línea evita que tu carpeta node_modules local sobrescriba la del contenedor
+      # Evita que tu carpeta node_modules local sobrescriba la del contenedor
       - /app/node_modules
