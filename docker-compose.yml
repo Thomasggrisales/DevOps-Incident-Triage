@@ -1,18 +1,33 @@
 version: '3.8'
 
 services:
+  db:
+    image: postgres:15-alpine
+    container_name: devops_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
   backend:
     build: 
       context: ./backend
     ports:
       - "8000:8000"
     volumes:
-      # Sincroniza tu código local con el contenedor
       - ./backend:/app
-    # Le dice a Docker exactamente cómo arrancar tu main.py real con Hot Reload activo
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    env_file:
+      - .env
     environment:
       - PYTHONUNBUFFERED=1
+    depends_on:
+      - db
 
   frontend:
     build: 
@@ -21,5 +36,7 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend:/app
-      # Evita que tu carpeta node_modules local sobrescriba la del contenedor
       - /app/node_modules
+
+volumes:
+  postgres_data: # Esto asegura que tus datos no se borren al apagar los contenedores
