@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.database import Base
@@ -6,6 +6,17 @@ from app.db.database import Base
 # Función auxiliar para la fecha actual en UTC
 def get_utc_now():
     return datetime.now(timezone.utc)
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    name = Column(String, nullable=False)
+    role = Column(String, default="devops") # Roles: 'admin', 'devops'
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=get_utc_now)
 
 class Incident(Base):
     __tablename__ = "incidents"

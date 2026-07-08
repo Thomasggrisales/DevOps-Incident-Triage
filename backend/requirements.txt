@@ -15,7 +15,14 @@ weaviate-client==4.5.4
 python-dotenv==1.0.1
 pydantic==2.6.3
 pydantic-settings==2.2.1
+email-validator==2.1.1
 
 # BASE DE DATOS RELACIONAL 
 sqlalchemy==2.0.28
 psycopg2-binary==2.9.9
+
+# SEGURIDAD Y AUTENTICACIÓN
+passlib[bcrypt]==1.7.4
+bcrypt==3.2.2
+PyJWT==2.8.0
+python-multipart==0.0.9
