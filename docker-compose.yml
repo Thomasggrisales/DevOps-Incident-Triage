@@ -39,4 +39,4 @@ services:
       - /app/node_modules
 
 volumes:
-  postgres_data: # Esto asegura que tus datos no se borren al apagar los contenedores
+  postgres_data: # Esto asegura que los datos no se borren al apagar los contenedores
