@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 from app.db.models import Incident, StatusHistory
 from app.schemas.incident import IncidentCreate
+from app.db.weaviate_client import get_weaviate_client
 
 def get_incidents(db: Session, skip: int = 0, limit: int = 100) -> list[Incident]:
     return db.query(Incident).offset(skip).limit(limit).all()
@@ -58,4 +59,35 @@ def update_incident_status(db: Session, incident_id: int, new_status: str) -> In
     db.commit()
     db.refresh(db_incident)
     
+    return db_incident
+
+def create_new_incident(db: Session, incident_in: IncidentCreate):
+    # 1. Guardar en Postgres
+    db_incident = models.Incident(
+        title=incident_in.title,
+        description=incident_in.description,
+        source=incident_in.source,
+        severity=incident_in.severity
+    )
+    db.add(db_incident)
+    db.commit()
+    db.refresh(db_incident)
+    
+    # 2. Indexar en Weaviate
+    try:
+        client = get_weaviate_client()
+        incidents = client.collections.get("Incident")
+        
+        # Ojo: asegúrate de que los campos coincidan con tu esquema de Weaviate
+        incidents.insert({
+            "incident_id": db_incident.id, 
+            "title": db_incident.title,
+            "description": db_incident.description,
+            "status": str(db_incident.status) # Aseguramos que sea string
+        })
+    except Exception as e:
+        # Es vital capturar esto para que no se caiga todo el proceso
+        # si Weaviate está temporalmente caído
+        print(f"Error indexando en Weaviate: {e}")
+        
     return db_incident
