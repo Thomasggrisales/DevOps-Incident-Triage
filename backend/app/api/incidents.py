@@ -1,12 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from typing import List
 from app.schemas.incident import IncidentCreate, IncidentResponse
 from app.services import incident as incident_service
 from app.db.database import get_db
+from app.services.incident import create_new_incident
 
-# SIN PREFIJO AQUÍ. El prefijo lo maneja main.py
 router = APIRouter()
+
+@router.post("/")
+def create_incident(incident: IncidentCreate, db: Session = Depends(get_db)):
+    # Llamamos al servicio centralizado
+    new_incident = create_new_incident(db, incident)
+    return {"message": "Registrado con éxito", "id": new_incident.id}
 
 @router.post("/", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
 def create_incident(incident_in: IncidentCreate, db: Session = Depends(get_db)):
@@ -25,3 +31,12 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
             detail=f"El incidente con ID {incident_id} no existe."
         )
     return db_incident
+
+@router.get("/search/")
+def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje natural")):
+    # Llamamos a nuestro nuevo servicio de búsqueda
+    results = search_incidents_semantic(query=q)
+    return {
+        "query": q,
+        "results": results
+    }
