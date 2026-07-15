@@ -43,6 +43,8 @@ El repositorio sigue una arquitectura de monorepo dividiendo claramente las resp
 * `frontend/`: Contiene la interfaz de usuario construida con Vite + React y TypeScript.
 * `docker-compose.yml`: Archivo de orquestación para levantar todos los servicios simultáneamente.
 
+<img width="1682" height="519" alt="Arquitectura drawio" src="https://github.com/user-attachments/assets/2c9b0579-dc2d-432e-8098-b9fc0170867a" />
+
 ---
 
 ## Instalación y Uso Local
