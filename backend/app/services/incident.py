@@ -10,7 +10,7 @@ def get_incident_by_id(db: Session, incident_id: int) -> Incident | None:
     return db.query(Incident).filter(Incident.id == incident_id).first()
 
 def create_new_incident(db: Session, incident_in: IncidentCreate) -> Incident:
-    # 1. Preparar el incidente principal
+    # 1. Guardado en PostgreSQL
     db_incident = Incident(
         title=incident_in.title,
         description=incident_in.description,
@@ -18,24 +18,38 @@ def create_new_incident(db: Session, incident_in: IncidentCreate) -> Incident:
         severity=incident_in.severity
     )
     db.add(db_incident)
-    
-    # Usamos flush() para que Postgres asigne el ID a db_incident, 
-    # pero sin cerrar la transacción todavía.
-    db.flush() 
+    db.flush() # Obtener el ID asignado por Postgres sin cerrar la transacción
 
-    # 2. Preparar el registro del estado inicial
+    # 2. Guardado del historial
     db_history = StatusHistory(
-        incident_id=db_incident.id, # Aquí ya tenemos el ID gracias al flush
+        incident_id=db_incident.id,
         old_status=None,
         new_status=db_incident.status,
         changed_by="System_Init"
     )
     db.add(db_history)
     
-    # 3. Guardar todo definitivamente en una sola transacción
+    # Commit final de ambos (Incidente + Historial)
     db.commit()
     db.refresh(db_incident)
 
+    # 3. Guardado vectorial en Weaviate
+    try:
+        client = get_weaviate_client()
+        incidents_collection = client.collections.get("Incident")
+        
+        incidents_collection.data.insert({
+            "postgres_id": db_incident.id,
+            "title": db_incident.title,
+            "description": db_incident.description,
+            "source": db_incident.source,
+            "severity": db_incident.severity,
+            "status": str(db_incident.status)
+        })
+    except Exception as e:
+        print(f"Error indexando en Weaviate: {e}")
+        # No hacemos raise para que el usuario reciba su incidente creado en Postgres
+        
     return db_incident
 
 def update_incident_status(db: Session, incident_id: int, new_status: str) -> Incident | None:
@@ -46,7 +60,6 @@ def update_incident_status(db: Session, incident_id: int, new_status: str) -> In
     old_status = db_incident.status
     db_incident.status = new_status
     
-    # Agregar registro al historial del cambio
     db_history = StatusHistory(
         incident_id=incident_id,
         old_status=old_status,
@@ -55,39 +68,32 @@ def update_incident_status(db: Session, incident_id: int, new_status: str) -> In
     )
     db.add(db_history)
     
-    # Como solo hay un commit aquí, la transacción ya es atómica
     db.commit()
     db.refresh(db_incident)
     
     return db_incident
 
-def create_new_incident(db: Session, incident_in: IncidentCreate):
-    # 1. Guardar en Postgres
-    db_incident = models.Incident(
-        title=incident_in.title,
-        description=incident_in.description,
-        source=incident_in.source,
-        severity=incident_in.severity
-    )
-    db.add(db_incident)
-    db.commit()
-    db.refresh(db_incident)
+def search_incidents_semantic(query: str, limit: int = 3):
+    client = get_weaviate_client()
+    incidents_collection = client.collections.get("Incident")
     
-    # 2. Indexar en Weaviate
-    try:
-        client = get_weaviate_client()
-        incidents = client.collections.get("Incident")
-        
-        # Ojo: asegúrate de que los campos coincidan con tu esquema de Weaviate
-        incidents.insert({
-            "incident_id": db_incident.id, 
-            "title": db_incident.title,
-            "description": db_incident.description,
-            "status": str(db_incident.status) # Aseguramos que sea string
+    # Búsqueda semántica usando el modelo de Hugging Face
+    response = incidents_collection.query.near_text(
+        query=query,
+        limit=limit,
+        return_metadata=None # Podemos pedir 'distance' si quieres ver qué tan preciso es
+    )
+    
+    # Formateamos los resultados para devolver algo limpio
+    results = []
+    for obj in response.objects:
+        results.append({
+            "postgres_id": obj.properties["postgres_id"],
+            "title": obj.properties["title"],
+            "description": obj.properties["description"],
+            "status": obj.properties["status"]
         })
-    except Exception as e:
-        # Es vital capturar esto para que no se caiga todo el proceso
-        # si Weaviate está temporalmente caído
-        print(f"Error indexando en Weaviate: {e}")
-        
-    return db_incident
+    
+    client.close()
+    return results
+
