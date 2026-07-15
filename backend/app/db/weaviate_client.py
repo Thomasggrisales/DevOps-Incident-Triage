@@ -15,7 +15,7 @@ def get_weaviate_client():
         grpc_port=50051,
         grpc_secure=False,
         headers={
-            "X-HuggingFace-Api-Key": HUGGINGFACE_APIKEY  # Weaviate usará esto internamente
+            "X-HuggingFace-Api-Key": HUGGINGFACE_APIKEY  
         }
     )
 
@@ -23,13 +23,12 @@ def init_weaviate_schema():
     """Crea la colección usando la API de Inferencia de Hugging Face."""
     client = get_weaviate_client()
     try:
-        # client.collections.delete("Incident") # Descomentar para limpiar la BD en desarrollo
+        
 
         if not client.collections.exists("Incident"):
             client.collections.create(
                 name="Incident",
                 description="Colección de incidentes de DevOps",
-                # NUEVO: Usamos Hugging Face y un modelo específico ligero y rápido
                 vectorizer_config=Configure.Vectorizer.text2vec_huggingface(
                     model="sentence-transformers/all-MiniLM-L6-v2" 
                 ),

@@ -34,7 +34,6 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
 
 @router.get("/search/")
 def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje natural")):
-    # Llamamos a nuestro nuevo servicio de búsqueda
     results = search_incidents_semantic(query=q)
     return {
         "query": q,
