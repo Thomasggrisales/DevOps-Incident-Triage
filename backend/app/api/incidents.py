@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from typing import List
 from app.schemas.incident import IncidentCreate, IncidentResponse
 from app.services import incident as incident_service
 from app.db.database import get_db
 from app.services.incident import create_new_incident
+from app.ai.rag import ask_devops_assistant
 
 router = APIRouter()
 
@@ -39,3 +41,22 @@ def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje na
         "query": q,
         "results": results
     }
+
+class ChatRequest(BaseModel):
+    question: str
+
+# Nuevo endpoint para el Asistente
+@router.post("/chat/")
+def chat_with_assistant(request: ChatRequest):
+    """
+    Habla con el Asistente DevOps. 
+    Busca contexto en Weaviate y responde usando Hugging Face.
+    """
+    try:
+        respuesta = ask_devops_assistant(request.question)
+        return {
+            "question": request.question,
+            "answer": respuesta
+        }
+    except Exception as e:
+        return {"error": f"Hubo un problema al contactar a la IA: {str(e)}"}

@@ -3,10 +3,10 @@ fastapi==0.110.0
 uvicorn==0.27.1
 
 # IA Y ORQUESTACIÓN 
-langchain==0.1.12
-langchain-openai==0.0.8
-langchain-community==0.0.28
-langchain-core==0.1.33
+langchain
+langchain-huggingface
+langchain-community
+langchain-core
 
 # BASE DE DATOS VECTORIAL 
 weaviate-client==4.5.4
