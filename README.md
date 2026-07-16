@@ -45,6 +45,9 @@ El repositorio sigue una arquitectura de monorepo dividiendo claramente las resp
 
 <img width="1682" height="519" alt="Arquitectura drawio" src="https://github.com/user-attachments/assets/2c9b0579-dc2d-432e-8098-b9fc0170867a" />
 
+## Arquitectura Agéntica
+<img width="1570" height="334" alt="DiagramaOrquestacion drawio" src="https://github.com/user-attachments/assets/f8df87d8-4d11-4b2f-8e22-7b9026f2c9dd" />
+
 ---
 
 ## Instalación y Uso Local
