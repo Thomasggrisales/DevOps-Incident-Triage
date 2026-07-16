@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   db:
     image: postgres:15-alpine
@@ -18,9 +20,6 @@ services:
     container_name: devops_backend
     ports:
       - "8000:8000"
-    dns:
-      - 8.8.8.8
-      - 8.8.4.4
     volumes:
       - ./backend:/app
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
@@ -42,26 +41,37 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
+  # 1. Contenedor de Inferencia de Inteligencia Artificial (Local)
+  t2v-transformers:
+    image: cr.weaviate.io/semitechnologies/transformers-inference:sentence-transformers-all-MiniLM-L6-v2
+    container_name: devops_t2v_transformers
+    environment:
+      ENABLE_CUDA: '0' # Configurado en 0 para correr en CPU de forma ligera
+
+  # 2. Tu servicio de Weaviate reconfigurado para usar el módulo local
   weaviate:
     image: cr.weaviate.io/semitechnologies/weaviate:1.24.4
     container_name: devops_weaviate
-    ports:
-      - "8081:8080"
-      - "50051:50051"
     dns:
       - 8.8.8.8
-      - 8.8.4.4
+    ports:
+      - "8080:8080"
+      - "50051:50051"
     restart: on-failure:0
     environment:
       QUERY_DEFAULTS_LIMIT: 25
       AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
       PERSISTENCE_DATA_PATH: '/var/lib/weaviate'
-      DEFAULT_VECTORIZER_MODULE: 'text2vec-huggingface'
-      ENABLE_MODULES: 'text2vec-huggingface'
-      HUGGINGFACE_APIKEY: ${HUGGINGFACE_API_KEY}
+      # Reemplazamos Hugging Face por Transformers
+      DEFAULT_VECTORIZER_MODULE: 'text2vec-transformers'
+      ENABLE_MODULES: 'text2vec-transformers'
+      # Apuntamos Weaviate a nuestro contenedor local de IA
+      TRANSFORMERS_INFERENCE_API: 'http://t2v-transformers:8080'
       CLUSTER_HOSTNAME: 'node1'
     volumes:
       - weaviate_data:/var/lib/weaviate
+    depends_on:
+      - t2v-transformers
 
 volumes:
   postgres_data: 
