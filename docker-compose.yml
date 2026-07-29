@@ -27,7 +27,9 @@ services:
       - .env
     environment:
       - PYTHONUNBUFFERED=1
-      - WEAVIATE_HOST=weaviate # <-- FORZAMOS LA CONEXIÓN AL CONTENEDOR
+      - WEAVIATE_HOST=weaviate 
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - db
       - weaviate

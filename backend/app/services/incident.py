@@ -1,8 +1,29 @@
+import requests
 from sqlalchemy.orm import Session
 from app.db.models import Incident, StatusHistory
 from app.schemas.incident import IncidentCreate
-# Importamos también la nueva función get_hf_embedding
-from app.db.weaviate_client import get_weaviate_client, get_hf_embedding
+from app.db.weaviate_client import get_weaviate_client
+
+def get_embedding_local(text: str) -> list:
+    """Genera embeddings usando Ollama localmente (sin internet)"""
+    # host.docker.internal apunta a tu máquina física (localhost)
+    OLLAMA_URL = "http://host.docker.internal:11434/api/embeddings"
+    
+    payload = {
+        "model": "all-minilm", # El mismo modelo ligero que usaba Hugging Face
+        "prompt": text
+    }
+    
+    try:
+        response = requests.post(OLLAMA_URL, json=payload, timeout=10)
+        if response.status_code == 200:
+            return response.json()["embedding"]
+        else:
+            print(f"Error en Ollama Embeddings: {response.text}")
+            return []
+    except Exception as e:
+        print(f"Error de conexión con Ollama Embeddings: {e}")
+        return []
 
 def get_incidents(db: Session, skip: int = 0, limit: int = 100) -> list[Incident]:
     return db.query(Incident).offset(skip).limit(limit).all()
@@ -34,7 +55,7 @@ def create_new_incident(db: Session, incident_in: IncidentCreate) -> Incident:
     db.commit()
     db.refresh(db_incident)
 
-    # 3. Guardado vectorial en Weaviate (Manual)
+    # 3. Guardado vectorial en Weaviate (Manual con Ollama)
     client = None
     try:
         client = get_weaviate_client()
@@ -42,19 +63,23 @@ def create_new_incident(db: Session, incident_in: IncidentCreate) -> Incident:
         
         # Generamos el vector combinando título y descripción
         texto_a_vectorizar = f"{db_incident.title}. {db_incident.description}"
-        vector = get_hf_embedding(texto_a_vectorizar)
+        vector = get_embedding_local(texto_a_vectorizar)
         
-        incidents_collection.data.insert(
-            properties={
-                "postgres_id": db_incident.id,
-                "title": db_incident.title,
-                "description": db_incident.description,
-                "source": db_incident.source,
-                "severity": db_incident.severity,
-                "status": str(db_incident.status)
-            },
-            vector=vector # Inyectamos el vector manualmente aquí
-        )
+        if vector:
+            incidents_collection.data.insert(
+                properties={
+                    "postgres_id": db_incident.id,
+                    "title": db_incident.title,
+                    "description": db_incident.description,
+                    "source": db_incident.source,
+                    "severity": db_incident.severity,
+                    "status": str(db_incident.status)
+                },
+                vector=vector # Inyectamos el vector manualmente aquí
+            )
+        else:
+            print("Advertencia: No se generó el vector en Ollama. El incidente no se indexó en Weaviate.")
+            
     except Exception as e:
         print(f"Error indexando en Weaviate: {e}")
         # No hacemos raise para que el usuario reciba su incidente creado en Postgres
@@ -91,8 +116,12 @@ def search_incidents_semantic(query: str, limit: int = 3):
         client = get_weaviate_client()
         incidents_collection = client.collections.get("Incident")
         
-        # 1. Vectorizamos la pregunta usando Python y Hugging Face
-        query_vector = get_hf_embedding(query)
+        # 1. Vectorizamos la pregunta usando Ollama localmente
+        query_vector = get_embedding_local(query)
+        
+        if not query_vector:
+            print("No se pudo generar el vector, abortando búsqueda en Weaviate.")
+            return []
         
         # 2. Búsqueda semántica usando los números (near_vector)
         response = incidents_collection.query.near_vector(
