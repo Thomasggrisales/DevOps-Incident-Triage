@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import softserveLogo from '../assets/softserve.png';
+
 export default function Chat() {
   const [messages, setMessages] = useState([
     { role: 'agent', text: '¡Hola! Soy tu Asistente DevOps. Analizo los registros de Weaviate para ayudarte. ¿Qué incidente estamos revisando hoy?' }
@@ -104,11 +106,14 @@ export default function Chat() {
         
         {/* Cabecera del Chat */}
         <div className="bg-slate-900/80 border-b border-white/10 p-5 flex items-center gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-400 shadow-inner">
-            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
-          </div>
+          
+          {/* Imagen corregida: sin el div contenedor que tenía el margin-bottom */}
+          <img 
+            src={softserveLogo}
+            alt="Softserve Logo" 
+            className="h-12 w-12 rounded-xl object-cover shadow-lg bg-white/5 border border-white/10"
+          />
+          
           <div>
             <h2 className="text-xl font-bold text-white tracking-tight">Copilot de Incidentes</h2>
             <p className="text-sm text-gray-400 flex items-center gap-2">
