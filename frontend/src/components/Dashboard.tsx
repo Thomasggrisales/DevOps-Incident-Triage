@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
+import softserveLogo from '../assets/softserve.png';
+
 export default function Dashboard() {
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const navigate = useNavigate();
@@ -31,9 +33,12 @@ export default function Dashboard() {
       {/* Barra Lateral (Sidebar) */}
       <aside className="hidden w-64 flex-col border-r border-white/10 bg-slate-900/50 p-6 md:flex">
         <div className="mb-8 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 font-bold text-white shadow-lg">
-            DT
-          </div>
+          {/* AQUÍ ESTÁ EL CAMBIO: Reemplazamos el div del 'DT' por tu imagen softserve.png */}
+          <img 
+            src={softserveLogo}
+            alt="Softserve Logo" 
+            className="h-10 w-10 rounded-lg object-cover shadow-lg bg-white/5 border border-white/10"
+          />
           <h2 className="text-xl font-extrabold tracking-tight">DevOps Triage</h2>
         </div>
 
