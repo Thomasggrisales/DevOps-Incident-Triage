@@ -71,7 +71,7 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
     # 2. Verificar la contraseña
     if not security.verify_password(user_in.password, user.hashed_password):
         raise HTTPException(
-            status_code=status.HTTP_41_UNAUTHORIZED,
+            status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Correo electrónico o contraseña incorrectos"
         )
     

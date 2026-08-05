@@ -7,6 +7,8 @@ langchain
 langchain-huggingface
 langchain-community
 langchain-core
+langgraph
+langchain-ollama
 
 # BASE DE DATOS VECTORIAL 
 weaviate-client==4.5.4
