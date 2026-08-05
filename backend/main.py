@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager # NUEVO: Para el ciclo de vida
-from app.db.weaviate_client import init_weaviate_schema # NUEVO: Tu función de Weaviate
+from app.db.weaviate_client import init_weaviate_schema, seed_runbooks # NUEVO: Tu función de Weaviate
 
 from app.db.database import engine
 from app.db import models
@@ -18,6 +18,7 @@ async def lifespan(app: FastAPI):
     try:
         print("Inicializando esquema de Weaviate...")
         init_weaviate_schema()
+        seed_runbooks()
     except Exception as e:
         print(f"ADVERTENCIA: No se pudo conectar con Weaviate al arrancar: {e}")
     

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Boolean, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 from app.db.database import Base
@@ -43,3 +43,16 @@ class StatusHistory(Base):
     changed_by = Column(String, default="System_AI")  
 
     incident = relationship("Incident", back_populates="history")
+
+
+class AgentSession(Base):
+    __tablename__ = "agent_sessions"
+
+    id = Column(String, primary_key=True, index=True)
+    user_id = Column(Integer, nullable=True)
+    incident_id = Column(Integer, nullable=True)
+    title = Column(String, nullable=True)
+    status = Column(String, default="active")  # active | closed
+    conversation = Column(JSON, default=list)
+    created_at = Column(DateTime, default=get_utc_now)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)

@@ -13,8 +13,8 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/chat" element={<Chat />} /> 
-        
+        <Route path="/chat" element={<Chat />} />
+
         {/* Redirigir cualquier ruta desconocida al login por ahora */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

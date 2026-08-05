@@ -1,35 +1,53 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import softserveLogo from '../assets/softserve.png';
 
+interface AgentState {
+  severity?: string;
+  owner_team?: string;
+  hypothesis?: string;
+  plan?: string[];
+  actions_taken?: string[];
+  pending_checks?: string[];
+  fix?: string;
+  fix_risk?: string;
+  needs_approval?: boolean;
+  verification?: string;
+  verdict?: string;
+}
+
+interface ChatMessage {
+  role: 'user' | 'agent';
+  text: string;
+}
+
 export default function Chat() {
-  const [messages, setMessages] = useState([
-    { role: 'agent', text: '¡Hola! Soy tu Asistente DevOps. Analizo los registros de Weaviate para ayudarte. ¿Qué incidente estamos revisando hoy?' }
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { role: 'agent', text: '¡Hola! Soy el Copilot de Triage DevOps. Envíame una alerta o descripción de incidente y lo clasificaré, investigaré con logs/métricas, propondré un fix y lo verificaré.' }
   ]);
+  const [agentState, setAgentState] = useState<AgentState | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null); // Nueva referencia para controlar la altura del textarea
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const navigate = useNavigate();
 
-  // Auto-scroll al final del chat
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-  
+
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, agentState]);
 
-  // Lógica principal de envío (separada para llamarla desde el teclado o el botón)
   const executeSend = async () => {
     if (!input.trim() || isLoading) return;
 
     const userMessage = input.trim();
     setInput('');
-    
-    // Reseteamos la altura del textarea después de enviar
+
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -41,15 +59,17 @@ export default function Chat() {
       const response = await fetch('http://localhost:8000/incidents/chat/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: userMessage }),
+        body: JSON.stringify({ question: userMessage, session_id: sessionId }),
       });
 
       const data = await response.json();
 
       if (response.ok) {
+        setSessionId(data.session_id);
+        setAgentState(data.state);
         setMessages((prev) => [...prev, { role: 'agent', text: data.answer }]);
       } else {
-        setMessages((prev) => [...prev, { role: 'agent', text: `Error: ${data.error || 'Hubo un problema de conexión.'}` }]);
+        setMessages((prev) => [...prev, { role: 'agent', text: `Error: ${data.detail || data.error || 'Hubo un problema de conexión.'}` }]);
       }
     } catch (error) {
       setMessages((prev) => [...prev, { role: 'agent', text: 'Error crítico: No se pudo conectar con el backend.' }]);
@@ -58,40 +78,36 @@ export default function Chat() {
     }
   };
 
-  // Manejador del botón o formulario tradicional
-  const handleSendForm = (e) => {
+  const handleSendForm = (e: FormEvent) => {
     e.preventDefault();
     executeSend();
   };
 
-  // Manejador del teclado (El corazón del Shift + Enter)
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      if (e.shiftKey) {
-        // Si presiona Shift + Enter, dejamos que haga el salto de línea normal
-        return;
-      }
-      // Si solo presiona Enter, evitamos el salto de línea y enviamos
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       executeSend();
     }
   };
 
-  // Manejador de cambio de texto (Auto-ajusta la altura del textarea)
-  const handleInputChange = (e) => {
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
-    
-    // Reseteamos la altura a auto para calcular el nuevo tamaño
     e.target.style.height = 'auto';
-    // Establecemos la altura basada en el scrollHeight (con un límite máximo en CSS)
     e.target.style.height = `${e.target.scrollHeight}px`;
+  };
+
+  const startNewSession = () => {
+    setSessionId(null);
+    setAgentState(null);
+    setMessages([
+      { role: 'agent', text: 'Nueva sesión de incidente iniciada. Envíame la alerta o descripción.' }
+    ]);
   };
 
   return (
     <div className="flex min-h-screen bg-slate-900 text-white font-sans">
-      
-      {/* Botón para volver al Dashboard */}
-      <button 
+
+      <button
         onClick={() => navigate('/dashboard')}
         className="absolute top-6 left-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
       >
@@ -101,20 +117,16 @@ export default function Chat() {
         Volver al Dashboard
       </button>
 
-      {/* Contenedor Principal del Chat */}
-      <div className="flex flex-col w-full max-w-4xl mx-auto my-16 bg-white/5 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-sm overflow-hidden">
-        
-        {/* Cabecera del Chat */}
+      <div className="flex flex-col w-full max-w-5xl mx-auto my-16 bg-white/5 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-sm overflow-hidden">
+
         <div className="bg-slate-900/80 border-b border-white/10 p-5 flex items-center gap-4">
-          
-          {/* Imagen corregida: sin el div contenedor que tenía el margin-bottom */}
-          <img 
+          <img
             src={softserveLogo}
-            alt="Softserve Logo" 
+            alt="Softserve Logo"
             className="h-12 w-12 rounded-xl object-cover shadow-lg bg-white/5 border border-white/10"
           />
-          
-          <div>
+
+          <div className="flex-1">
             <h2 className="text-xl font-bold text-white tracking-tight">Copilot de Incidentes</h2>
             <p className="text-sm text-gray-400 flex items-center gap-2">
               <span className="relative flex h-2 w-2">
@@ -124,39 +136,119 @@ export default function Chat() {
               Conectado a Weaviate Vector DB
             </p>
           </div>
-        </div>
 
-        {/* Área de Mensajes */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-[500px]">
-          {messages.map((msg, index) => (
-            <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[80%] p-4 rounded-2xl text-sm leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'bg-blue-600 text-white rounded-tr-sm shadow-md'
-                    : 'bg-white/5 border border-white/10 text-gray-200 rounded-tl-sm shadow-sm'
-                }`}
-              >
-                {/* Formateo simple para respetar los saltos de línea del agente y del usuario */}
-                <span className="whitespace-pre-wrap font-mono">{msg.text}</span>
-              </div>
-            </div>
-          ))}
-          
-          {/* Indicador de Carga */}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-sm flex gap-2 items-center w-24 shadow-sm">
-                <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce"></div>
-                <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-100"></div>
-                <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-200"></div>
-              </div>
-            </div>
+          {sessionId && (
+            <button
+              onClick={startNewSession}
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              Nueva sesión
+            </button>
           )}
-          <div ref={messagesEndRef} />
         </div>
 
-        {/* Zona de Input */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Área de mensajes */}
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 min-h-[500px] max-h-[600px]">
+            {messages.map((msg, index) => (
+              <div key={index} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div
+                  className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === 'user'
+                      ? 'bg-blue-600 text-white rounded-tr-sm shadow-md'
+                      : 'bg-white/5 border border-white/10 text-gray-200 rounded-tl-sm shadow-sm'
+                  }`}
+                >
+                  <span className="whitespace-pre-wrap font-mono">{msg.text}</span>
+                </div>
+              </div>
+            ))}
+
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-white/5 border border-white/10 p-4 rounded-2xl rounded-tl-sm flex gap-2 items-center w-24 shadow-sm">
+                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce"></div>
+                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-100"></div>
+                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce delay-200"></div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Panel de razonamiento del agente */}
+          {agentState && (
+            <aside className="w-80 border-l border-white/10 overflow-y-auto max-h-[600px] bg-slate-900/40 p-4 space-y-4 text-sm">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-400">Razonamiento del agente</h3>
+
+              <div className="flex flex-wrap gap-2">
+                <span className={`px-2 py-1 rounded-md text-xs font-semibold ${
+                  agentState.severity === 'critical' ? 'bg-red-500/20 text-red-300'
+                  : agentState.severity === 'high' ? 'bg-orange-500/20 text-orange-300'
+                  : agentState.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-300'
+                  : 'bg-blue-500/20 text-blue-300'
+                }`}>
+                  Severidad: {agentState.severity || 'pending'}
+                </span>
+                {agentState.owner_team && (
+                  <span className="px-2 py-1 rounded-md bg-purple-500/20 text-purple-300 text-xs font-semibold">
+                    {agentState.owner_team}
+                  </span>
+                )}
+                {agentState.needs_approval && (
+                  <span className="px-2 py-1 rounded-md bg-amber-500/20 text-amber-300 text-xs font-semibold">
+                    Requiere aprobación
+                  </span>
+                )}
+              </div>
+
+              <Section title="Hipótesis" value={agentState.hypothesis} />
+              <Section title="Fix propuesto" value={agentState.fix} />
+              <Section title="Verificación" value={agentState.verification} />
+
+              {agentState.actions_taken && agentState.actions_taken.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-1">Acciones tomadas</h4>
+                  <ul className="space-y-1">
+                    {agentState.actions_taken.map((a, i) => (
+                      <li key={i} className="text-xs text-gray-300 flex gap-2">
+                        <span className="text-green-400">✓</span> {a}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {agentState.pending_checks && agentState.pending_checks.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-1">Checks pendientes</h4>
+                  <ul className="space-y-1">
+                    {agentState.pending_checks.map((c, i) => (
+                      <li key={i} className="text-xs text-gray-300 flex gap-2">
+                        <span className="text-amber-400">○</span> {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {agentState.evidence && agentState.evidence.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-400 mb-1">Herramientas usadas</h4>
+                  <ul className="space-y-1">
+                    {agentState.evidence.map((e: any, i: number) => (
+                      <li key={i} className="text-xs text-gray-300">
+                        <span className="text-purple-400">{e.tool}</span>
+                        <span className="text-gray-500"> ← {e.query}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </aside>
+          )}
+        </div>
+
         <div className="p-4 bg-slate-900/50 border-t border-white/10">
           <form onSubmit={handleSendForm} className="flex gap-3 items-end">
             <textarea
@@ -164,7 +256,9 @@ export default function Chat() {
               value={input}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              placeholder="Ej: ¿Hay incidentes activos? (Shift + Enter para nueva línea)"
+              placeholder={sessionId
+                ? "Envía una corrección o aprueba el fix... (Shift + Enter para nueva línea)"
+                : "Ej: 'El API Gateway está devolviendo 504 en producción'"}
               rows={1}
               className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all resize-none overflow-y-auto min-h-[48px] max-h-[200px] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full hover:[&::-webkit-scrollbar-thumb]:bg-white/30"
               disabled={isLoading}
@@ -182,6 +276,16 @@ export default function Chat() {
           </form>
         </div>
       </div>
+    </div>
+  );
+}
+
+function Section({ title, value }: { title: string; value?: string }) {
+  if (!value) return null;
+  return (
+    <div>
+      <h4 className="text-xs font-semibold text-gray-400 mb-1">{title}</h4>
+      <p className="text-xs text-gray-200 leading-relaxed whitespace-pre-wrap">{value}</p>
     </div>
   );
 }
