@@ -3,10 +3,12 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List
 from uuid import uuid4
+from datetime import datetime
 import logging
 
 from app.schemas.incident import IncidentCreate, IncidentResponse
 from app.services import incident as incident_service
+from app.services.incident import search_incidents_semantic
 from app.db.database import get_db
 from app.db import models
 from app.ai.agent import agent_graph
@@ -24,6 +26,72 @@ def create_incident(incident_in: IncidentCreate, db: Session = Depends(get_db)):
 def list_incidents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     return incident_service.get_incidents(db=db, skip=skip, limit=limit)
 
+
+@router.get("/stats/")
+def incident_stats(db: Session = Depends(get_db)):
+    """Resumen de métricas del dashboard (totales, severidad, estado, MTTR)."""
+    incidents = db.query(models.Incident).all()
+
+    by_status: dict[str, int] = {}
+    by_severity: dict[str, int] = {}
+    for inc in incidents:
+        by_status[inc.status or "open"] = by_status.get(inc.status or "open", 0) + 1
+        by_severity[inc.severity or "pending"] = by_severity.get(inc.severity or "pending", 0) + 1
+
+    total = len(incidents)
+    active = by_status.get("open", 0) + by_status.get("investigating", 0)
+    resolved = by_status.get("resolved", 0)
+    resolution_rate = round(resolved / total * 100, 1) if total else 0.0
+    critical_active = sum(
+        1 for inc in incidents
+        if inc.severity == "critical" and inc.status not in ("resolved", "closed")
+    )
+
+    # MTTR: promedio de horas entre created_at y el primer cambio a "resolved".
+    mttr_seconds = []
+    for inc in incidents:
+        history = db.query(models.StatusHistory).filter(
+            models.StatusHistory.incident_id == inc.id,
+            models.StatusHistory.new_status == "resolved",
+        ).order_by(models.StatusHistory.changed_at.asc()).first()
+        if history and history.changed_at and inc.created_at:
+            delta = (history.changed_at - inc.created_at).total_seconds()
+            if delta >= 0:
+                mttr_seconds.append(delta)
+    mttr_hours = round(sum(mttr_seconds) / len(mttr_seconds) / 3600, 2) if mttr_seconds else None
+
+    recent = [
+        {
+            "id": i.id,
+            "title": i.title,
+            "severity": i.severity,
+            "status": i.status,
+            "source": i.source,
+            "created_at": i.created_at.isoformat() if i.created_at else None,
+        }
+        for i in sorted(incidents, key=lambda x: x.created_at or datetime.min, reverse=True)[:6]
+    ]
+
+    return {
+        "total": total,
+        "active": active,
+        "resolved": resolved,
+        "critical_active": critical_active,
+        "resolution_rate": resolution_rate,
+        "mttr_hours": mttr_hours,
+        "by_status": by_status,
+        "by_severity": by_severity,
+        "recent": recent,
+    }
+
+@router.get("/search/")
+def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje natural")):
+    results = search_incidents_semantic(query=q)
+    return {
+        "query": q,
+        "results": results
+    }
+
 @router.get("/{incident_id}", response_model=IncidentResponse)
 def get_incident(incident_id: int, db: Session = Depends(get_db)):
     db_incident = incident_service.get_incident_by_id(db=db, incident_id=incident_id)
@@ -33,14 +101,6 @@ def get_incident(incident_id: int, db: Session = Depends(get_db)):
             detail=f"El incidente con ID {incident_id} no existe."
         )
     return db_incident
-
-@router.get("/search/")
-def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje natural")):
-    results = search_incidents_semantic(query=q)
-    return {
-        "query": q,
-        "results": results
-    }
 
 class ChatRequest(BaseModel):
     question: str

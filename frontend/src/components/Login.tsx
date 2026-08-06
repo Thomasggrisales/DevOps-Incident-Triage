@@ -32,8 +32,8 @@ export default function Login() {
       
       navigate('/dashboard');
       
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error de autenticación.');
     }
   };
 

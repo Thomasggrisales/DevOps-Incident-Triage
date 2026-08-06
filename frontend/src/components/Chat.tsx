@@ -60,13 +60,12 @@ export default function Chat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: msg.sessionId, decision }),
       });
-      const data = await response.json();
       if (response.ok) {
         setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: decision } : m)));
       } else {
         setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: 'error' } : m)));
       }
-    } catch (error) {
+    } catch {
       setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: 'error' } : m)));
     }
   };
@@ -114,7 +113,7 @@ export default function Chat() {
       } else {
         setMessages((prev) => [...prev, { role: 'agent', text: `Error: ${data.detail || data.error || 'Hubo un problema de conexión.'}` }]);
       }
-    } catch (error) {
+    } catch {
       setMessages((prev) => [...prev, { role: 'agent', text: 'Error crítico: No se pudo conectar con el backend.' }]);
     } finally {
       setIsLoading(false);
