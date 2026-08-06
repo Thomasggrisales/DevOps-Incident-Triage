@@ -31,8 +31,8 @@ export default function ForgotPassword() {
       setMessage('Si el correo está registrado, te hemos enviado un enlace con instrucciones para recuperar tu cuenta.');
       setEmail(''); // Limpiamos el campo
       
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar el correo.');
     } finally {
       setIsLoading(false);
     }
