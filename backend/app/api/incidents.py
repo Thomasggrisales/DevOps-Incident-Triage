@@ -53,6 +53,65 @@ class ApprovalRequest(BaseModel):
     comment: str | None = None
 
 
+# ---------------------------------------------------------------------------
+# Detección de un nuevo incidente dentro de una conversación existente.
+# Una sesión = un incidente: si el usuario describe otro incidente, se inicia
+# una sesión nueva para no contaminar el contexto con el incidente anterior.
+# ---------------------------------------------------------------------------
+
+_INCIDENT_SERVICE_KEYWORDS = [
+    "api-gateway", "apigateway", "gateway", "auth-service", "auth", "database",
+    "postgres", "redis", "worker", "frontend", "backend", "cache", "script",
+    "cron", "api", "microservicio", "servicio",
+]
+_INCIDENT_FAILURE_KEYWORDS = [
+    "error", "fail", "timeout", "caída", "caida", "caído", "caido", "down",
+    "outage", "lent", "crash", "pérdida", "perdida", "502", "503", "504",
+    "500", "falla", "no funciona", "no responde", "no arranca", "se cae",
+    "explota", "detenid",
+]
+_FOLLOWUP_HINTS = [
+    "aprueba", "rechaza", "aprobar", "rechazar", "qué evidencia", "que evidencia",
+    "qué hace", "que hace", "continúa", "continua", "sigue", "verifica",
+    "más info", "mas info", "detalle", "explica", "resumen", "por qué", "por que",
+]
+
+
+def _looks_like_new_incident(text: str) -> bool:
+    """Devuelve True si el mensaje parece la descripción de un incidente nuevo."""
+    t = text.lower()
+    if any(hint in t for hint in _FOLLOWUP_HINTS):
+        return False
+    mentions_service = any(k in t for k in _INCIDENT_SERVICE_KEYWORDS)
+    mentions_failure = any(k in t for k in _INCIDENT_FAILURE_KEYWORDS)
+    return (mentions_service or mentions_failure) and len(t.strip()) > 20
+
+
+def _start_new_session(db: Session, question: str):
+    """Crea un incidente y una sesión de agente para un nuevo triage."""
+    title = question[:80] + ("..." if len(question) > 80 else "")
+    incident = incident_service.create_new_incident(
+        db,
+        IncidentCreate(
+            title=title,
+            description=question,
+            source="chat",
+            severity="pending",
+        ),
+    )
+    session = models.AgentSession(
+        id=str(uuid4()),
+        incident_id=incident.id,
+        title=title,
+        status="active",
+        conversation=[],
+    )
+    db.add(session)
+    db.commit()
+    db.refresh(session)
+    return session, incident
+
+
 def _fresh_state(session: "models.AgentSession", incident: dict, question: str) -> dict:
     """Construye el estado inicial para una ejecución del grafo del agente."""
     messages = (session.conversation or []) + [{"role": "user", "content": question}]
@@ -87,6 +146,7 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
     try:
         session = None
         incident = None
+        new_session = False
 
         if request.session_id:
             session = db.query(models.AgentSession).filter(
@@ -94,31 +154,17 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
             ).first()
             if not session:
                 raise HTTPException(status_code=404, detail="La sesión no existe o fue cerrada.")
-            incident = incident_service.get_incident_by_id(db, session.incident_id)
-            if not incident:
-                raise HTTPException(status_code=404, detail="El incidente asociado ya no existe.")
+            if _looks_like_new_incident(request.question):
+                # El usuario describió otro incidente: nueva sesión, sin contexto previo.
+                session, incident = _start_new_session(db, request.question)
+                new_session = True
+            else:
+                incident = incident_service.get_incident_by_id(db, session.incident_id)
+                if not incident:
+                    raise HTTPException(status_code=404, detail="El incidente asociado ya no existe.")
         else:
             # Nueva sesión: se crea un incidente con el primer mensaje como alerta.
-            title = request.question[:80] + ("..." if len(request.question) > 80 else "")
-            incident = incident_service.create_new_incident(
-                db,
-                IncidentCreate(
-                    title=title,
-                    description=request.question,
-                    source="chat",
-                    severity="pending",
-                ),
-            )
-            session = models.AgentSession(
-                id=str(uuid4()),
-                incident_id=incident.id,
-                title=title,
-                status="active",
-                conversation=[],
-            )
-            db.add(session)
-            db.commit()
-            db.refresh(session)
+            session, incident = _start_new_session(db, request.question)
 
         incident_dict = {
             "id": incident.id,
@@ -163,6 +209,7 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
         return {
             "session_id": session.id,
             "answer": result.get("summary", "Sin respuesta del agente."),
+            "new_session": new_session,
             "state": {
                 "severity": result.get("severity"),
                 "owner_team": result.get("owner_team"),

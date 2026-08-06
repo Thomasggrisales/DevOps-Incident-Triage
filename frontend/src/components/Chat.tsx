@@ -96,15 +96,21 @@ export default function Chat() {
       if (response.ok) {
         if (data.session_id) setSessionId(data.session_id);
         setAgentState(data.state);
-        setMessages((prev) => [...prev, {
-          role: 'agent',
+        const agentMsg = {
+          role: 'agent' as const,
           text: data.answer,
           sessionId: data.session_id,
           needsApproval: Boolean(data.state?.needs_approval),
           fix: data.state?.fix || '',
           fixRisk: data.state?.fix_risk || '',
           approvalStatus: null,
-        }]);
+        };
+        if (data.new_session) {
+          // El usuario describió otro incidente: empezamos un hilo limpio.
+          setMessages([agentMsg]);
+        } else {
+          setMessages((prev) => [...prev, agentMsg]);
+        }
       } else {
         setMessages((prev) => [...prev, { role: 'agent', text: `Error: ${data.detail || data.error || 'Hubo un problema de conexión.'}` }]);
       }
