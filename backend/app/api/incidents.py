@@ -112,12 +112,16 @@ def _start_new_session(db: Session, question: str):
     return session, incident
 
 
+def _conversation_messages(session: "models.AgentSession", question: str) -> list[dict]:
+    """Mensajes de la sesión + el nuevo mensaje del usuario."""
+    return (session.conversation or []) + [{"role": "user", "content": question}]
+
+
 def _fresh_state(session: "models.AgentSession", incident: dict, question: str) -> dict:
     """Construye el estado inicial para una ejecución del grafo del agente."""
-    messages = (session.conversation or []) + [{"role": "user", "content": question}]
     return {
         "incident": incident,
-        "messages": messages,
+        "messages": _conversation_messages(session, question),
         "hypothesis": "",
         "severity": "pending",
         "owner_team": "",
@@ -175,13 +179,25 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
             "status": incident.status,
         }
 
-        initial_state = _fresh_state(session, incident_dict, request.question)
-
         # Trazabilidad con Langfuse (degradación silenciosa si no hay claves).
         langfuse_handler = get_langfuse_handler()
         config = {"configurable": {"thread_id": session.id}}
         if langfuse_handler is not None:
             config["callbacks"] = [langfuse_handler]
+
+        # Si la sesión ya tiene un checkpoint en Postgres, se reanuda el estado
+        # persistido (hipótesis, evidencia, checks, etc.) pasando solo los mensajes.
+        has_checkpoint = False
+        if not new_session and request.session_id:
+            try:
+                has_checkpoint = agent_graph.checkpointer.get_tuple(config) is not None
+            except Exception:
+                has_checkpoint = False
+
+        if has_checkpoint:
+            initial_state = {"messages": _conversation_messages(session, request.question)}
+        else:
+            initial_state = _fresh_state(session, incident_dict, request.question)
 
         with trace_context(
             langfuse_handler,

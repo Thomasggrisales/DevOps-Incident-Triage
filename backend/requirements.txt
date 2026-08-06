@@ -26,6 +26,10 @@ email-validator==2.1.1
 sqlalchemy==2.0.28
 psycopg2-binary==2.9.9
 
+# CHECKPOINTS DEL AGENTE EN POSTGRES
+langgraph-checkpoint-postgres
+psycopg[binary]
+
 # SEGURIDAD Y AUTENTICACIÓN
 passlib[bcrypt]==1.7.4
 bcrypt==3.2.2
