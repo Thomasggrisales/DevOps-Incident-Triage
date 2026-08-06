@@ -9,6 +9,7 @@ pendientes sobreviven a lo largo de toda la sesión del incidente.
 """
 import json
 import logging
+import os
 import re
 from typing import TypedDict
 
@@ -360,6 +361,30 @@ def handle_error(state: IncidentState) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Checkpointer: persiste el estado del grafo en Postgres (sobrevive reinicios).
+# Si la BD no está disponible, degrada a memoria sin romper el flujo.
+# ---------------------------------------------------------------------------
+
+def _create_checkpointer():
+    database_url = os.getenv(
+        "DATABASE_URL",
+        "postgresql://postgres_user:postgres_password123@db:5432/devops_incident_db",
+    )
+    try:
+        import psycopg
+        from langgraph.checkpoint.postgres import PostgresSaver
+
+        conn = psycopg.connect(database_url, autocommit=True, prepare_threshold=0)
+        checkpointer = PostgresSaver(conn)
+        checkpointer.setup()
+        logger.info("Checkpointer de Postgres inicializado.")
+        return checkpointer
+    except Exception as e:
+        logger.warning("Postgres checkpointer no disponible, usando MemorySaver: %s", e)
+        return MemorySaver()
+
+
+# ---------------------------------------------------------------------------
 # Construcción del grafo
 # ---------------------------------------------------------------------------
 
@@ -386,7 +411,7 @@ def _build_graph():
     workflow.add_conditional_edges("finish", has_critical_error, {"finish": END, "handle_error": "handle_error"})
     workflow.add_edge("handle_error", END)
 
-    checkpointer = MemorySaver()
+    checkpointer = _create_checkpointer()
     return workflow.compile(checkpointer=checkpointer)
 
 
