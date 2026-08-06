@@ -47,6 +47,12 @@ class ChatRequest(BaseModel):
     session_id: str | None = None
 
 
+class ApprovalRequest(BaseModel):
+    session_id: str
+    decision: str  # "approved" | "rejected"
+    comment: str | None = None
+
+
 def _fresh_state(session: "models.AgentSession", incident: dict, question: str) -> dict:
     """Construye el estado inicial para una ejecución del grafo del agente."""
     messages = (session.conversation or []) + [{"role": "user", "content": question}]
@@ -176,4 +182,50 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
         raise
     except Exception as e:
         logger.exception("Error en el chat del agente.")
-        return {"error": f"Hubo un problema al contactar al agente: {str(e)}"} 
+        return {"error": f"Hubo un problema al contactar al agente: {str(e)}"}
+
+
+@router.post("/approval/")
+def submit_approval(request: ApprovalRequest, db: Session = Depends(get_db)):
+    """Registra la decisión humana sobre el fix propuesto por el agente."""
+    if request.decision not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="Decisión inválida. Use 'approved' o 'rejected'.")
+
+    session = db.query(models.AgentSession).filter(
+        models.AgentSession.id == request.session_id
+    ).first()
+    if not session:
+        raise HTTPException(status_code=404, detail="La sesión no existe o fue cerrada.")
+    incident = incident_service.get_incident_by_id(db, session.incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="El incidente asociado ya no existe.")
+
+    old_status = incident.status
+    new_status = "resolved" if request.decision == "approved" else "open"
+    incident.status = new_status
+
+    history = models.StatusHistory(
+        incident_id=incident.id,
+        old_status=old_status,
+        new_status=new_status,
+        changed_by="human_operator",
+    )
+    db.add(history)
+
+    decision_line = (
+        f"[DECISIÓN HUMANA] El operador {'APROBÓ' if request.decision == 'approved' else 'RECHAZÓ'} "
+        f"el fix propuesto (estado del incidente: {new_status})."
+    )
+    if request.comment:
+        decision_line += f" Comentario: {request.comment}"
+    session.conversation = (session.conversation or []) + [
+        {"role": "agent", "content": decision_line}
+    ]
+    db.add(session)
+    db.commit()
+
+    return {
+        "decision": request.decision,
+        "incident_id": incident.id,
+        "status": incident.status,
+    } 
