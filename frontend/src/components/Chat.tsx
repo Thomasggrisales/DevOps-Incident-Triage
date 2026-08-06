@@ -10,6 +10,7 @@ interface AgentState {
   plan?: string[];
   actions_taken?: string[];
   pending_checks?: string[];
+  evidence?: { tool: string; query: string; result?: string }[];
   fix?: string;
   fix_risk?: string;
   needs_approval?: boolean;
@@ -20,6 +21,11 @@ interface AgentState {
 interface ChatMessage {
   role: 'user' | 'agent';
   text: string;
+  sessionId?: string | null;
+  needsApproval?: boolean;
+  fix?: string;
+  fixRisk?: string;
+  approvalStatus?: string | null;
 }
 
 export default function Chat() {
@@ -41,6 +47,29 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, agentState]);
+
+  // Registra la decisión humana sobre el fix propuesto por el agente.
+  const handleApproval = async (index: number, decision: 'approved' | 'rejected') => {
+    const msg = messages[index];
+    if (!msg?.sessionId || msg.approvalStatus) return;
+
+    setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: 'pending' } : m)));
+    try {
+      const response = await fetch('http://localhost:8000/incidents/approval/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: msg.sessionId, decision }),
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: decision } : m)));
+      } else {
+        setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: 'error' } : m)));
+      }
+    } catch (error) {
+      setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: 'error' } : m)));
+    }
+  };
 
   const executeSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -65,9 +94,17 @@ export default function Chat() {
       const data = await response.json();
 
       if (response.ok) {
-        setSessionId(data.session_id);
+        if (data.session_id) setSessionId(data.session_id);
         setAgentState(data.state);
-        setMessages((prev) => [...prev, { role: 'agent', text: data.answer }]);
+        setMessages((prev) => [...prev, {
+          role: 'agent',
+          text: data.answer,
+          sessionId: data.session_id,
+          needsApproval: Boolean(data.state?.needs_approval),
+          fix: data.state?.fix || '',
+          fixRisk: data.state?.fix_risk || '',
+          approvalStatus: null,
+        }]);
       } else {
         setMessages((prev) => [...prev, { role: 'agent', text: `Error: ${data.detail || data.error || 'Hubo un problema de conexión.'}` }]);
       }
@@ -102,6 +139,49 @@ export default function Chat() {
     setMessages([
       { role: 'agent', text: 'Nueva sesión de incidente iniciada. Envíame la alerta o descripción.' }
     ]);
+  };
+
+  const renderApprovalCard = (msg: ChatMessage, index: number) => {
+    if (!msg.needsApproval || !msg.fix) return null;
+
+    let statusContent;
+    if (msg.approvalStatus === 'approved') {
+      statusContent = <p className="mt-2 text-sm font-medium text-green-400">✓ Fix aprobado y aplicado. Incidente resuelto.</p>;
+    } else if (msg.approvalStatus === 'rejected') {
+      statusContent = <p className="mt-2 text-sm font-medium text-red-400">✗ Fix rechazado. Incidente reabierto.</p>;
+    } else if (msg.approvalStatus === 'error') {
+      statusContent = <p className="mt-2 text-sm font-medium text-red-400">Error al registrar la decisión. Intenta de nuevo.</p>;
+    } else {
+      statusContent = (
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => handleApproval(index, 'approved')}
+            disabled={isLoading || msg.approvalStatus === 'pending'}
+            className="px-4 py-2 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            Aprobar fix
+          </button>
+          <button
+            onClick={() => handleApproval(index, 'rejected')}
+            disabled={isLoading || msg.approvalStatus === 'pending'}
+            className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium disabled:opacity-50 transition-colors"
+          >
+            Rechazar
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-3 p-3 rounded-xl bg-slate-800/80 border border-amber-500/40">
+        <p className="text-amber-300 font-semibold mb-1">
+          Fix propuesto requiere aprobación
+          {msg.fixRisk ? ` (riesgo: ${msg.fixRisk})` : ''}
+        </p>
+        <p className="whitespace-pre-wrap text-xs text-gray-300">{msg.fix}</p>
+        {statusContent}
+      </div>
+    );
   };
 
   return (
@@ -160,6 +240,7 @@ export default function Chat() {
                   }`}
                 >
                   <span className="whitespace-pre-wrap font-mono">{msg.text}</span>
+                  {renderApprovalCard(msg, index)}
                 </div>
               </div>
             ))}
@@ -236,7 +317,7 @@ export default function Chat() {
                 <div>
                   <h4 className="text-xs font-semibold text-gray-400 mb-1">Herramientas usadas</h4>
                   <ul className="space-y-1">
-                    {agentState.evidence.map((e: any, i: number) => (
+                    {agentState.evidence.map((e, i) => (
                       <li key={i} className="text-xs text-gray-300">
                         <span className="text-purple-400">{e.tool}</span>
                         <span className="text-gray-500"> ← {e.query}</span>
