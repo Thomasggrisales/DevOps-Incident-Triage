@@ -10,6 +10,7 @@ from app.services import incident as incident_service
 from app.db.database import get_db
 from app.db import models
 from app.ai.agent import agent_graph
+from app.ai.langfuse_setup import get_langfuse_handler, trace_context
 
 logger = logging.getLogger(__name__)
 
@@ -123,10 +124,21 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
         }
 
         initial_state = _fresh_state(session, incident_dict, request.question)
-        result = agent_graph.invoke(
-            initial_state,
-            config={"configurable": {"thread_id": session.id}},
-        )
+
+        # Trazabilidad con Langfuse (degradación silenciosa si no hay claves).
+        langfuse_handler = get_langfuse_handler()
+        config = {"configurable": {"thread_id": session.id}}
+        if langfuse_handler is not None:
+            config["callbacks"] = [langfuse_handler]
+
+        with trace_context(
+            langfuse_handler,
+            trace_name="incident-triage-agent",
+            session_id=session.id,
+            metadata={"incident_id": incident.id, "source": incident.source},
+            tags=["incident-triage", "langgraph"],
+        ):
+            result = agent_graph.invoke(initial_state, config=config)
 
         # Persistir la conversación y actualizar severidad/estado del incidente.
         conversation = initial_state["messages"] + [
