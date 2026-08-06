@@ -10,6 +10,9 @@ langchain-core
 langgraph
 langchain-ollama
 
+# OBSERVABILIDAD (trazabilidad del agente)
+langfuse>=3.0.0
+
 # BASE DE DATOS VECTORIAL 
 weaviate-client==4.5.4
 
