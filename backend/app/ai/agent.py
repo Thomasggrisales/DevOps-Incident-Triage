@@ -18,6 +18,14 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.ai import tools
+from app.services import diagnostics as _diagnostics
+
+# Cliente MCP opcional: si no está instalado, el agente degrada a las
+# implementaciones locales (las mismas que expone el MCP server).
+try:
+    from app.mcp.client import mcp_invoke
+except Exception:  # pragma: no cover - entorno sin MCP instalado
+    mcp_invoke = None
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +99,15 @@ def _get_last_user_message(state: IncidentState) -> str:
         if msg.get("role") == "user":
             return msg.get("content", "")
     return state.get("incident", {}).get("description", "")
+
+
+def _invoke_diag(name: str, **kwargs) -> str:
+    """Invoca una tool de diagnóstico vía MCP; cae a la implementación local si falla."""
+    if mcp_invoke is not None:
+        result = mcp_invoke(name, **kwargs)
+        if result is not None:
+            return result
+    return getattr(_diagnostics, name)(**kwargs)
 
 
 def _conversation_context(state: IncidentState) -> str:
@@ -243,6 +260,25 @@ def investigate(state: IncidentState) -> dict:
     similar_result = tools.search_similar_incidents.invoke({"query": similar_query})
     evidence.append({"tool": "search_similar_incidents", "query": similar_query, "result": similar_result})
     actions.append("Se buscaron incidentes históricos similares.")
+
+    # 1b) Diagnóstico adicional (despliegues, salud, alertas, BD) vía MCP.
+    #     El agente consulta el servidor MCP estándar y cae a la implementación
+    #     local solo si el server no está disponible.
+    primary = services[0] if services else "database"
+    diagnostics_specs = [
+        ("fetch_deployment_history", {"service": primary, "limit": 5, "seed": seed}),
+        ("check_service_health", {"service": primary, "seed": seed}),
+        ("get_alert_history", {"service": primary, "minutes": 180, "seed": seed}),
+    ]
+    for tool_name, kwargs in diagnostics_specs:
+        result = _invoke_diag(tool_name, **kwargs)
+        evidence.append({"tool": tool_name, "query": primary, "result": result})
+        actions.append(f"Se revisó {tool_name} de '{primary}'.")
+
+    db_query = "SELECT id, titulo, severidad, estado FROM incidents WHERE status = 'open'"
+    db_result = _invoke_diag("query_database", query=db_query)
+    evidence.append({"tool": "query_database", "query": "incidentes abiertos", "result": db_result})
+    actions.append("Se consultó la base de datos (incidentes abiertos).")
 
     # 2) El LLM sintetiza la hipótesis con la evidencia.
     evidence_text = "\n\n".join(

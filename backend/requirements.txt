@@ -16,6 +16,10 @@ langfuse>=3.0.0
 # BASE DE DATOS VECTORIAL 
 weaviate-client==4.5.4
 
+# MCP (Model Context Protocol): server y adaptadores para LangChain
+mcp
+langchain-mcp-adapters
+
 # UTILIDADES 
 python-dotenv==1.0.1
 pydantic==2.6.3
