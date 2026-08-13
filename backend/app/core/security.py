@@ -19,15 +19,19 @@ def get_password_hash(password: str) -> str:
     """Genera un hash seguro a partir de una contraseña"""
     return pwd_context.hash(password)
 
-def create_access_token(subject: Union[str, Any], expires_delta: timedelta = None) -> str:
-    """Genera un token JWT firmado para el usuario"""
+def create_access_token(
+    subject: Union[str, Any],
+    expires_delta: timedelta = None,
+    token_type: str = "access",
+) -> str:
+    """Genera un token JWT firmado para el usuario."""
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    
+
     # Información que viajará encriptada dentro del token (payload)
-    to_encode = {"exp": expire, "sub": str(subject)}
+    to_encode = {"exp": expire, "sub": str(subject), "type": token_type}
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
