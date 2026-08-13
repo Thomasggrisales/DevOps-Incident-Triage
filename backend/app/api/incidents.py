@@ -11,6 +11,7 @@ from app.services import incident as incident_service
 from app.services.incident import search_incidents_semantic
 from app.db.database import get_db
 from app.db import models
+from app.core.deps import get_current_user
 from app.ai.agent import agent_graph
 from app.ai.langfuse_setup import get_langfuse_handler, trace_context
 
@@ -19,16 +20,28 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 @router.post("/", response_model=IncidentResponse, status_code=status.HTTP_201_CREATED)
-def create_incident(incident_in: IncidentCreate, db: Session = Depends(get_db)):
+def create_incident(
+    incident_in: IncidentCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     return incident_service.create_new_incident(db=db, incident_in=incident_in)
 
 @router.get("/", response_model=List[IncidentResponse])
-def list_incidents(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+def list_incidents(
+    skip: int = 0,
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     return incident_service.get_incidents(db=db, skip=skip, limit=limit)
 
 
 @router.get("/stats/")
-def incident_stats(db: Session = Depends(get_db)):
+def incident_stats(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """Resumen de métricas del dashboard (totales, severidad, estado, MTTR)."""
     incidents = db.query(models.Incident).all()
 
@@ -85,7 +98,10 @@ def incident_stats(db: Session = Depends(get_db)):
     }
 
 @router.get("/search/")
-def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje natural")):
+def search_incidents(
+    q: str = Query(..., description="Tu consulta en lenguaje natural"),
+    current_user: models.User = Depends(get_current_user),
+):
     results = search_incidents_semantic(query=q)
     return {
         "query": q,
@@ -93,7 +109,11 @@ def search_incidents(q: str = Query(..., description="Tu consulta en lenguaje na
     }
 
 @router.get("/{incident_id}", response_model=IncidentResponse)
-def get_incident(incident_id: int, db: Session = Depends(get_db)):
+def get_incident(
+    incident_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     db_incident = incident_service.get_incident_by_id(db=db, incident_id=incident_id)
     if not db_incident:
         raise HTTPException(
@@ -202,7 +222,11 @@ def _fresh_state(session: "models.AgentSession", incident: dict, question: str) 
 
 # Endpoint para el Asistente con agente LangGraph y sesiones persistentes
 @router.post("/chat/")
-def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
+def chat_with_assistant(
+    request: ChatRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """
     Chatea con el agente de triage. Sin session_id inicia una nueva sesión
     de incidente; con session_id continúa el triage anterior.
@@ -309,7 +333,11 @@ def chat_with_assistant(request: ChatRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/approval/")
-def submit_approval(request: ApprovalRequest, db: Session = Depends(get_db)):
+def submit_approval(
+    request: ApprovalRequest,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
     """Registra la decisión humana sobre el fix propuesto por el agente."""
     if request.decision not in ("approved", "rejected"):
         raise HTTPException(status_code=400, detail="Decisión inválida. Use 'approved' o 'rejected'.")

@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import softserveLogo from '../assets/softserve.png';
+import { apiFetch } from '../api';
 
 interface IncidentStats {
   total: number;
@@ -80,7 +81,7 @@ export default function Dashboard() {
   const navigate = useNavigate();
 
   const getStats = async (): Promise<IncidentStats | null> => {
-    const response = await fetch('http://localhost:8000/incidents/stats/');
+    const response = await apiFetch('/incidents/stats/');
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return await response.json();
   };

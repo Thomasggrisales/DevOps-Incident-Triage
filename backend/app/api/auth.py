@@ -5,8 +5,7 @@ from datetime import timedelta
 import logging
 from app.db import models
 from app.core import security
-# Asumiendo que en app.db.database tienes una función para obtener la sesión
-from app.db.database import Base 
+from app.db.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -14,16 +13,6 @@ logger = logging.getLogger(__name__)
 RESET_TOKEN_EXPIRE_MINUTES = 30
 
 router = APIRouter()
-
-# Dependencia para obtener la sesión de la base de datos
-# Cambia esta importación si tu función para la sesión se llama diferente
-def get_db():
-    from app.db.database import SessionLocal
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # --- SCHEMAS DE PYDANTIC (Para validar la entrada y salida de datos) ---
 class UserLogin(BaseModel):
@@ -48,6 +37,10 @@ class ForgotPasswordResponse(BaseModel):
     message: str
     reset_token: str | None = None
     expires_in_minutes: int = RESET_TOKEN_EXPIRE_MINUTES
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
 
 # --- ENDPOINTS ---
 
@@ -124,9 +117,41 @@ def forgot_password(user_in: ForgotPasswordRequest, db: Session = Depends(get_db
     reset_token = security.create_access_token(
         subject=user.id,
         expires_delta=timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
+        token_type="password_reset",
     )
     logger.info("Token de recuperación generado para el usuario %s.", user.email)
     return ForgotPasswordResponse(
         message="Si el correo está registrado, hemos enviado las instrucciones.",
         reset_token=reset_token,
     )
+
+
+@router.post("/reset-password")
+def reset_password(request: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Cambia la contraseña usando el token de recuperación (válido 30 min)."""
+    payload = security.decode_token(request.token)
+    if not payload or payload.get("type") != "password_reset":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token de recuperación inválido o expirado.",
+        )
+
+    try:
+        user_id = int(payload.get("sub"))
+    except (TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token de recuperación inválido o expirado.",
+        )
+
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token de recuperación inválido o expirado.",
+        )
+
+    user.hashed_password = security.get_password_hash(request.new_password)
+    db.commit()
+    logger.info("Contraseña restablecida para el usuario %s.", user.email)
+    return {"message": "Contraseña actualizada correctamente."}
