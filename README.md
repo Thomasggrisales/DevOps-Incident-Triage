@@ -47,7 +47,7 @@ Un sistema inteligente para la clasificación, gestión y asignación de inciden
 * `docker-compose.yml`: Archivo de orquestación para levantar todos los servicios simultáneamente.
 * `.env.example`: Plantilla de variables de entorno requeridas.
 
-<img width="1682" height="519" alt="Arquitectura drawio" src="https://github.com/user-attachments/assets/2c9b0579-dc2d-432e-8098-b9fc0170867a" />
+<img width="1682" height="614" alt="Arquitectura" src="https://github.com/user-attachments/assets/088478a0-6e9c-44e4-9199-45153212e05e" />
 
 ## Arquitectura Agéntica
 <img width="1570" height="334" alt="DiagramaOrquestacion drawio" src="https://github.com/user-attachments/assets/f8df87d8-4d11-4b2f-8e22-7b9026f2c9dd" />
