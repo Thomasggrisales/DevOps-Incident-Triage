@@ -1,10 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
+from datetime import timedelta
+import logging
 from app.db import models
 from app.core import security
 # Asumiendo que en app.db.database tienes una función para obtener la sesión
 from app.db.database import Base 
+
+logger = logging.getLogger(__name__)
+
+# Validez del token de recuperación de contraseña (30 minutos).
+RESET_TOKEN_EXPIRE_MINUTES = 30
 
 router = APIRouter()
 
@@ -33,6 +40,14 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     user: dict
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_token: str | None = None
+    expires_in_minutes: int = RESET_TOKEN_EXPIRE_MINUTES
 
 # --- ENDPOINTS ---
 
@@ -88,3 +103,30 @@ def login(user_in: UserLogin, db: Session = Depends(get_db)):
             "role": user.role
         }
     }
+
+
+@router.post("/forgot-password", response_model=ForgotPasswordResponse)
+def forgot_password(user_in: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Genera un token de recuperación de contraseña para el correo indicado.
+
+    Por seguridad no se revela si el correo existe (evita enumeración de usuarios):
+    siempre se devuelve el mismo mensaje. Mientras no haya infraestructura de
+    correo, el token se devuelve en la respuesta para poder completar el flujo.
+    """
+    user = db.query(models.User).filter(models.User.email == user_in.email).first()
+
+    if not user or not user.is_active:
+        logger.info("Solicitud de recuperación para correo no registrado o inactivo.")
+        return ForgotPasswordResponse(
+            message="Si el correo está registrado, hemos enviado las instrucciones."
+        )
+
+    reset_token = security.create_access_token(
+        subject=user.id,
+        expires_delta=timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES),
+    )
+    logger.info("Token de recuperación generado para el usuario %s.", user.email)
+    return ForgotPasswordResponse(
+        message="Si el correo está registrado, hemos enviado las instrucciones.",
+        reset_token=reset_token,
+    )
