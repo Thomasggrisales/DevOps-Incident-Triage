@@ -37,7 +37,11 @@ const SEVERITY_BADGE: Record<string, string> = {
 
 function formatDate(iso: string | null): string {
   if (!iso) return '—';
-  return new Date(iso).toLocaleString('es-CO', {
+  // El backend guarda UTC. Si el ISO no trae zona horaria, lo interpretamos como UTC
+  // para evitar que `new Date` lo lea como hora local y muestre una hora desfasada.
+  const hasTz = /[zZ]|[+-]\d{2}:?\d{2}$/.test(iso);
+  const normalized = hasTz ? iso : `${iso}Z`;
+  return new Date(normalized).toLocaleString('es-CO', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
