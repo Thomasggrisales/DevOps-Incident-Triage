@@ -1,6 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 class StatusHistoryResponse(BaseModel):
     id: int
@@ -9,8 +9,7 @@ class StatusHistoryResponse(BaseModel):
     changed_at: datetime
     changed_by: str
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IncidentCreate(BaseModel):
@@ -29,5 +28,4 @@ class IncidentResponse(IncidentCreate):
     created_at: datetime
     # history: List[StatusHistoryResponse] = []
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

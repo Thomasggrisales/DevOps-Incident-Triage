@@ -5,8 +5,7 @@ from datetime import timedelta
 import logging
 from app.db import models
 from app.core import security
-# Asumiendo que en app.db.database tienes una función para obtener la sesión
-from app.db.database import Base 
+from app.db.database import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -14,16 +13,6 @@ logger = logging.getLogger(__name__)
 RESET_TOKEN_EXPIRE_MINUTES = 30
 
 router = APIRouter()
-
-# Dependencia para obtener la sesión de la base de datos
-# Cambia esta importación si tu función para la sesión se llama diferente
-def get_db():
-    from app.db.database import SessionLocal
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # --- SCHEMAS DE PYDANTIC (Para validar la entrada y salida de datos) ---
 class UserLogin(BaseModel):
