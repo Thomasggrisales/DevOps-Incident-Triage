@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent, type C
 import { useNavigate } from 'react-router-dom';
 
 import softserveLogo from '../assets/softserve.png';
+import { apiFetch } from '../api';
 
 interface AgentState {
   severity?: string;
@@ -55,9 +56,8 @@ export default function Chat() {
 
     setMessages((prev) => prev.map((m, i) => (i === index ? { ...m, approvalStatus: 'pending' } : m)));
     try {
-      const response = await fetch('http://localhost:8000/incidents/approval/', {
+      const response = await apiFetch('/incidents/approval/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: msg.sessionId, decision }),
       });
       if (response.ok) {
@@ -84,9 +84,8 @@ export default function Chat() {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/incidents/chat/', {
+      const response = await apiFetch('/incidents/chat/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: userMessage, session_id: sessionId }),
       });
 
