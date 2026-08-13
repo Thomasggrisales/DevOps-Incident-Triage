@@ -1,13 +1,19 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Union
+import os
+from dotenv import load_dotenv
 from passlib.context import CryptContext
 import jwt
+
+load_dotenv()
 
 # Configuración del algoritmo de hashing para contraseñas
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-# Configuración básica de JWT (En producción esto debe ir en el .env)
-SECRET_KEY = "SUPER_SECRET_DEVOPS_KEY_CHANGE_THIS_IN_PRODUCTION"
+# Configuración de JWT. En producción define SECRET_KEY en el .env
+SECRET_KEY = os.getenv(
+    "SECRET_KEY", "SUPER_SECRET_DEVOPS_KEY_CHANGE_THIS_IN_PRODUCTION"
+)
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # El token durará 24 horas
 
