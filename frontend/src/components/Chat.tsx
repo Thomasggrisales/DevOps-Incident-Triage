@@ -192,15 +192,26 @@ export default function Chat() {
   return (
     <div className="flex min-h-screen bg-slate-900 text-white font-sans">
 
-      <button
-        onClick={() => navigate('/dashboard')}
-        className="absolute top-6 left-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-      >
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-        </svg>
-        Volver al Dashboard
-      </button>
+      <div className="absolute left-6 top-6 flex items-center gap-4">
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+          </svg>
+          Dashboard
+        </button>
+        <button
+          onClick={() => navigate('/incidents')}
+          className="flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
+        >
+          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+          </svg>
+          Incidentes
+        </button>
+      </div>
 
       <div className="flex flex-col w-full max-w-5xl mx-auto my-16 bg-white/5 border border-white/10 rounded-2xl shadow-2xl backdrop-blur-sm overflow-hidden">
 

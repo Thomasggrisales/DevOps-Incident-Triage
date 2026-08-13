@@ -3,6 +3,7 @@ import Login from './components/Login';
 import Register from './components/Register';
 import ForgotPassword from './components/ForgotPassword';
 import Dashboard from './components/Dashboard';
+import Incidents from './components/Incidents';
 import Chat from './components/Chat';
 
 function App() {
@@ -13,6 +14,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/incidents" element={<Incidents />} />
         <Route path="/chat" element={<Chat />} />
 
         {/* Redirigir cualquier ruta desconocida al login por ahora */}
