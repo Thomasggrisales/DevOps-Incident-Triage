@@ -16,7 +16,7 @@ class User(Base):
     name = Column(String, nullable=False)
     role = Column(String, default="devops") # Roles: 'admin', 'devops'
     is_active = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=get_utc_now)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
 
 class Incident(Base):
     __tablename__ = "incidents"
@@ -27,7 +27,7 @@ class Incident(Base):
     source = Column(String, nullable=False)  
     severity = Column(String, nullable=False)  
     status = Column(String, default="open")  
-    created_at = Column(DateTime, default=get_utc_now)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
 
     history = relationship("StatusHistory", back_populates="incident", cascade="all, delete-orphan")
 
@@ -39,7 +39,7 @@ class StatusHistory(Base):
     incident_id = Column(Integer, ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False)
     old_status = Column(String, nullable=True)
     new_status = Column(String, nullable=False)
-    changed_at = Column(DateTime, default=get_utc_now)
+    changed_at = Column(DateTime(timezone=True), default=get_utc_now)
     changed_by = Column(String, default="System_AI")  
 
     incident = relationship("Incident", back_populates="history")
@@ -54,5 +54,5 @@ class AgentSession(Base):
     title = Column(String, nullable=True)
     status = Column(String, default="active")  # active | closed
     conversation = Column(JSON, default=list)
-    created_at = Column(DateTime, default=get_utc_now)
-    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now)
+    created_at = Column(DateTime(timezone=True), default=get_utc_now)
+    updated_at = Column(DateTime(timezone=True), default=get_utc_now, onupdate=get_utc_now)
