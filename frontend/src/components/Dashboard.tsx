@@ -12,14 +12,6 @@ interface IncidentStats {
   mttr_hours: number | null;
   by_status: Record<string, number>;
   by_severity: Record<string, number>;
-  recent: {
-    id: number;
-    title: string;
-    severity: string;
-    status: string;
-    source: string;
-    created_at: string | null;
-  }[];
 }
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'pending'];
@@ -76,21 +68,6 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
     </div>
   );
 }
-
-const STATUS_BADGE: Record<string, string> = {
-  open: 'bg-rose-500/20 text-rose-300',
-  investigating: 'bg-amber-500/20 text-amber-300',
-  resolved: 'bg-green-500/20 text-green-300',
-  closed: 'bg-gray-500/20 text-gray-300',
-};
-
-const SEVERITY_BADGE: Record<string, string> = {
-  critical: 'bg-red-500/20 text-red-300',
-  high: 'bg-orange-500/20 text-orange-300',
-  medium: 'bg-yellow-500/20 text-yellow-300',
-  low: 'bg-blue-500/20 text-blue-300',
-  pending: 'bg-gray-500/20 text-gray-300',
-};
 
 export default function Dashboard() {
   const [user] = useState<{ name: string; email: string } | null>(() => {
@@ -176,22 +153,28 @@ export default function Dashboard() {
         </div>
 
         <nav className="flex flex-1 flex-col gap-2">
-          <a href="#" className="flex items-center gap-3 rounded-lg bg-blue-600/20 px-4 py-3 text-blue-400 transition-colors">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex w-full items-center gap-3 rounded-lg bg-blue-600/20 px-4 py-3 text-left text-blue-400 transition-colors"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
             </svg>
             Inicio
-          </a>
-          <a href="#" className="flex items-center gap-3 rounded-lg px-4 py-3 text-gray-400 transition-colors hover:bg-white/5 hover:text-white">
+          </button>
+          <button
+            onClick={() => navigate('/incidents')}
+            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
             Incidentes
-          </a>
+          </button>
 
           <button
             onClick={() => navigate('/chat')}
-            className="flex items-center gap-3 rounded-lg mt-4 border border-purple-500/30 bg-purple-600/10 px-4 py-3 text-purple-400 transition-colors hover:bg-purple-600/20 hover:text-purple-300 w-full text-left"
+            className="mt-4 flex w-full items-center gap-3 rounded-lg border border-purple-500/30 bg-purple-600/10 px-4 py-3 text-left text-purple-400 transition-colors hover:bg-purple-600/20 hover:text-purple-300"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -248,43 +231,6 @@ export default function Dashboard() {
             </Panel>
             <Panel title="Incidentes por estado">
               <BarChart data={statusBars} />
-            </Panel>
-          </div>
-
-          <div className="mt-8">
-            <Panel title="Incidentes recientes">
-              {stats && stats.recent.length > 0 ? (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wider text-gray-500">
-                      <th className="pb-2 pr-4 font-medium">ID</th>
-                      <th className="pb-2 pr-4 font-medium">Título</th>
-                      <th className="pb-2 pr-4 font-medium">Severidad</th>
-                      <th className="pb-2 font-medium">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {stats.recent.map((inc) => (
-                      <tr key={inc.id} className="border-b border-white/5 last:border-0">
-                        <td className="py-2.5 pr-4 text-gray-400">#{inc.id}</td>
-                        <td className="max-w-[300px] truncate py-2.5 pr-4 text-gray-200">{inc.title}</td>
-                        <td className="py-2.5 pr-4">
-                          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${SEVERITY_BADGE[inc.severity] || SEVERITY_BADGE.pending}`}>
-                            {inc.severity}
-                          </span>
-                        </td>
-                        <td className="py-2.5">
-                          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${STATUS_BADGE[inc.status] || STATUS_BADGE.open}`}>
-                            {inc.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-gray-500">Aún no hay incidentes registrados.</p>
-              )}
             </Panel>
           </div>
         </div>
