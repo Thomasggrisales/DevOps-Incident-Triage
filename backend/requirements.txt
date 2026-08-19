@@ -26,6 +26,12 @@ pydantic-settings
 email-validator
 python-frontmatter
 
+# WEB SCRAPING
+requests
+beautifulsoup4
+readability-lxml
+markdownify
+
 # BASE DE DATOS RELACIONAL 
 sqlalchemy
 psycopg2-binary
