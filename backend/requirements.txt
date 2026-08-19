@@ -36,6 +36,6 @@ psycopg[binary]
 
 # SEGURIDAD Y AUTENTICACIÓN
 passlib[bcrypt]
-bcrypt
+bcrypt==3.2.2
 PyJWT
 python-multipart
