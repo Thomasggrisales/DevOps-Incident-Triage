@@ -2,16 +2,18 @@
 Servicio de web scraping para obtener documentación DevOps de fuentes públicas.
 
 Fuentes soportadas:
-- GitHub repos (README, docs/, postmortems, runbooks)
+- GitHub repos (README, docs/, postmortems, runbooks) via git clone
 - Status pages (Statuspage.io, Cachet, etc.)
 
 Uso CLI (desde backend/):
-    python -m app.services.scraper --source github --repo dastergon/postmortem-repository
+    python -m app.services.scraper --source github --repo dfds/postmortems
     python -m app.services.scraper --source statuspage --url https://status.datadoghq.com
 """
 import json
 import os
 import re
+import shutil
+import subprocess
 import time
 from datetime import datetime
 from typing import Optional
@@ -24,6 +26,10 @@ from markdownify import markdownify as md
 # Directorio temporal para contenido descargado
 SCRAPER_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".scraper_cache")
 os.makedirs(SCRAPER_CACHE_DIR, exist_ok=True)
+
+# Directorio para repos clonados
+CLONES_DIR = os.path.join(SCRAPER_CACHE_DIR, "clones")
+os.makedirs(CLONES_DIR, exist_ok=True)
 
 
 class GitHubScraper:
@@ -59,17 +65,115 @@ class GitHubScraper:
             return base64.b64decode(data["content"]).decode("utf-8")
         return ""
     
-    def scrape_repo(self, repo: str, paths: list[str] = None) -> list[dict]:
+    def clone_repo(self, repo: str) -> str:
+        """
+        Clona un repositorio de GitHub usando git clone.
+        
+        Args:
+            repo: Repositorio en formato "owner/repo"
+        
+        Returns:
+            Ruta al directorio clonado
+        """
+        clone_url = f"https://github.com/{repo}.git"
+        repo_name = repo.replace("/", "_")
+        local_path = os.path.join(CLONES_DIR, repo_name)
+        
+        # Si ya existe, hacer git pull
+        if os.path.exists(local_path):
+            print(f"  Repo ya existe, actualizando: {local_path}")
+            try:
+                subprocess.run(["git", "-C", local_path, "pull"], 
+                             capture_output=True, text=True, timeout=30)
+                return local_path
+            except Exception as e:
+                print(f"  [WARN] Error actualizando repo: {e}")
+                # Eliminar y clonar de nuevo
+                shutil.rmtree(local_path)
+        
+        # Clonar repo
+        print(f"  Clonando {repo}...")
+        try:
+            result = subprocess.run(
+                ["git", "clone", "--depth", "1", clone_url, local_path],
+                capture_output=True,
+                text=True,
+                timeout=120
+            )
+            if result.returncode != 0:
+                raise Exception(f"git clone failed: {result.stderr}")
+            print(f"  [OK] Repo clonado en: {local_path}")
+            return local_path
+        except subprocess.TimeoutExpired:
+            raise Exception("git clone timeout después de 120 segundos")
+        except FileNotFoundError:
+            raise Exception("git no está instalado en el sistema")
+    
+    def scrape_repo_via_git(self, repo: str) -> list[dict]:
+        """
+        Scrapea un repositorio usando git clone (sin rate limits).
+        
+        Args:
+            repo: Repositorio en formato "owner/repo"
+        
+        Returns:
+            Lista de documentos encontrados
+        """
+        documents = []
+        
+        try:
+            local_path = self.clone_repo(repo)
+            self._process_local_repo(local_path, repo, documents)
+        except Exception as e:
+            print(f"  [ERROR] Error scrapeando repo {repo}: {e}")
+        
+        return documents
+    
+    def _process_local_repo(self, repo_path: str, repo_name: str, documents: list[dict]):
+        """Procesa un repositorio clonado localmente."""
+        ignore_dirs = {".git", ".github", ".vscode", ".idea", "node_modules", "__pycache__"}
+        ignore_files = {"readme.md", "license.md", "license", "contributing.md", ".gitignore", ".editorconfig"}
+        
+        for root, dirs, files in os.walk(repo_path):
+            # Ignorar directorios no relevantes
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+            
+            for file in files:
+                if file.lower().endswith((".md", ".mdx", ".txt", ".rst")):
+                    if file.lower() in ignore_files:
+                        continue
+                    
+                    filepath = os.path.join(root, file)
+                    rel_path = os.path.relpath(filepath, repo_path)
+                    
+                    try:
+                        with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                            content = f.read()
+                        
+                        if content and len(content.strip()) >= 100:
+                            doc = self._parse_document(content, file, rel_path, repo_name)
+                            if doc:
+                                documents.append(doc)
+                                print(f"  [OK] {rel_path}")
+                    except Exception as e:
+                        print(f"  [ERROR] Error leyendo {rel_path}: {e}")
+    
+    def scrape_repo(self, repo: str, paths: list[str] = None, method: str = "git") -> list[dict]:
         """
         Scrapea un repositorio completo buscando documentos relevantes.
         
         Args:
             repo: Repositorio en formato "owner/repo"
             paths: Rutas específicas a scrapear (default: ["", "docs", "runbooks", "postmortems"])
+            method: Método a usar ("git" para git clone, "api" para GitHub API)
         
         Returns:
             Lista de documentos encontrados
         """
+        if method == "git":
+            return self.scrape_repo_via_git(repo)
+        
+        # Método API (original)
         if paths is None:
             paths = ["", "docs", "runbooks", "postmortems", "incidents"]
         
@@ -407,10 +511,10 @@ class StatusPageScraper:
         return "low"
 
 
-def scrape_github_repo(repo: str, token: Optional[str] = None) -> list[dict]:
+def scrape_github_repo(repo: str, token: Optional[str] = None, method: str = "git") -> list[dict]:
     """Función de conveniencia para scrapeear un repositorio de GitHub."""
     scraper = GitHubScraper(token=token)
-    return scraper.scrape_repo(repo)
+    return scraper.scrape_repo(repo, method=method)
 
 
 def scrape_status_page(url: str) -> list[dict]:
@@ -461,12 +565,14 @@ if __name__ == "__main__":
     parser.add_argument("--repo", help="Repositorio de GitHub (formato: owner/repo)")
     parser.add_argument("--url", help="URL de la status page")
     parser.add_argument("--output", help="Directorio de salida para documentos")
+    parser.add_argument("--method", choices=["git", "api"], default="git",
+                        help="Método para GitHub: 'git' (sin rate limit) o 'api' (necesita token)")
     
     args = parser.parse_args()
     
     if args.source == "github" and args.repo:
-        print(f"Scrapeando repositorio: {args.repo}")
-        docs = scrape_github_repo(args.repo)
+        print(f"Scrapeando repositorio: {args.repo} (método: {args.method})")
+        docs = scrape_github_repo(args.repo, method=args.method)
         print(f"Encontrados {len(docs)} documentos")
         
         if docs:

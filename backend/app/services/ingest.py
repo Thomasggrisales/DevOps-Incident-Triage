@@ -226,6 +226,8 @@ if __name__ == "__main__":
     parser.add_argument("--dir", default=DOCS_DIR, help="Directorio de docs (default: backend/docs/)")
     parser.add_argument("--scrape-github", nargs="+", help="Repositorios de GitHub a scrapeear (formato: owner/repo)")
     parser.add_argument("--scrape-statuspage", nargs="+", help="URLs de status pages a scrapeear")
+    parser.add_argument("--scrape-method", choices=["git", "api"], default="git",
+                        help="Método para GitHub scraping: 'git' (default, sin rate limit) o 'api'")
     parser.add_argument("--skip-scrape", action="store_true", help="Omitir ingesta de documentos scrapeados")
     args = parser.parse_args()
 
@@ -237,8 +239,8 @@ if __name__ == "__main__":
         
         if args.scrape_github:
             for repo in args.scrape_github:
-                print(f"\nScrapeando repositorio: {repo}")
-                docs = scrape_github_repo(repo)
+                print(f"\nScrapeando repositorio: {repo} (método: {args.scrape_method})")
+                docs = scrape_github_repo(repo, method=args.scrape_method)
                 print(f"  Encontrados {len(docs)} documentos")
                 all_docs.extend(docs)
         
