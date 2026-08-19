@@ -180,17 +180,24 @@ def classify(state: IncidentState) -> dict:
     incident = state.get("incident", {})
     user_text = _get_last_user_message(state)
     system = (
-        "Eres un ingeniero DevOps de guardia senior. Clasifica el incidente y plantea una hipótesis inicial. "
-        "Responde SOLO con JSON válido y sin texto adicional: "
+        "Eres un ingeniero DevOps de guardia senior. "
+        "Clasifica el incidente según su impacto y asigna el equipo responsable.\n\n"
+        "Criterios de severidad:\n"
+        "- critical: servicio principal caído, pérdida de datos, breach de seguridad\n"
+        "- high: degradación severa, errores >5%, múltiples usuarios afectados\n"
+        "- medium: latencia elevada, errores intermitentes, un servicio afectado\n"
+        "- low: Cosmético, incidente menor, sin impacto en usuarios\n\n"
+        "Responde SOLO con JSON válido:\n"
         '{"severity": "critical|high|medium|low", "owner_team": "<equipo>", '
-        '"hypothesis": "<hipótesis inicial>", "notes": "<razonamiento breve>"}'
+        '"hypothesis": "<hipótesis inicial basada en la descripción>", '
+        '"notes": "<razonamiento breve>"}'
     )
     prompt = (
         f"Incidente:\nTítulo: {incident.get('title')}\n"
         f"Descripción: {incident.get('description')}\nFuente: {incident.get('source')}\n\n"
         f"Contexto de la conversación:\n{_conversation_context(state)}\n\n"
         f"Último mensaje del ingeniero: {user_text}\n\n"
-        f"Servicios disponibles en el sistema: {tools.available_service_hint()}"
+        f"Servicios disponibles: {tools.available_service_hint()}"
     )
 
     data = _parse_json(_chat(system, prompt))
@@ -219,11 +226,17 @@ def investigate(state: IncidentState) -> dict:
 
     # 1) El LLM decide qué servicios y búsquedas ejecutar.
     system = (
-        "Eres un ingeniero DevOps investigando un incidente. Decide qué herramientas usar. "
-        f"Servicios disponibles: {tools.available_service_hint()}. "
-        "Responde SOLO con JSON: "
-        '{"services": ["<servicios a revisar>"], "runbook_query": "<consulta para runbooks>", '
-        '"similar_query": "<consulta para incidentes similares>"}'
+        "Eres un ingeniero DevOps investigando un incidente. "
+        "Tu objetivo es recopilar evidencia de múltiples fuentes para confirmar o descartar la hipótesis.\n\n"
+        f"Servicios disponibles: {tools.available_service_hint()}\n\n"
+        "Debes buscar:\n"
+        "1. Logs y métricas de los servicios sospechosos\n"
+        "2. Runbooks que describan síntomas similares (la consulta debe incluir palabras clave del problema)\n"
+        "3. Incidentes históricos similares\n\n"
+        "Responde SOLO con JSON:\n"
+        '{"services": ["<servicios a revisar, máximo 3>"], '
+        '"runbook_query": "<consulta con palabras clave del problema para buscar en runbooks>", '
+        '"similar_query": "<descripción concisa del problema para buscar incidentes similares>"}'
     )
     plan_data = _parse_json(_chat(system, f"Incidente:\n{incident.get('description', '')}\n\n"
                                           f"Hipótesis actual: {state.get('hypothesis')}"))
@@ -285,10 +298,18 @@ def investigate(state: IncidentState) -> dict:
         f"[{item['tool']} <- {item['query']}]\n{item['result']}" for item in evidence
     )
     system = (
-        "Sintetiza la hipótesis del incidente usando la evidencia. "
-        "Responde SOLO con JSON: "
-        '{"hypothesis": "<hipótesis refinada>", "pending_checks": ["<check 1>", "<check 2>"], '
-        '"notes": "<qué evidencia confirma o descarta>"}'
+        "Eres un ingeniero DevOps senior analizando evidencia de un incidente.\n\n"
+        "REGLAS IMPORTANTES:\n"
+        "- Los runbooks son documentación autoritativa. Si un runbook describe los mismos síntomas, "
+        "su diagnóstico y solución tienen prioridad sobre cualquier otra evidencia.\n"
+        "- Los postmortems son incidentes reales anteriores. Si hay un postmortem similar, "
+        "referencia las lecciones aprendidas.\n"
+        "- Si la evidencia contradice el runbook, indica la discrepancia.\n\n"
+        "Responde SOLO con JSON:\n"
+        '{"hypothesis": "<hipótesis refinada con evidencia>", '
+        '"runbook_used": "<título del runbook aplicable, o null si ninguno>", '
+        '"pending_checks": ["<check 1>", "<check 2>"], '
+        '"notes": "<qué evidencia confirma o descarta, y por qué>"}'
     )
     syn = _parse_json(_chat(system, f"Incidente: {incident.get('description', '')}\n\nEvidencia:\n{evidence_text[:3500]}"))
     if not syn:
@@ -306,16 +327,27 @@ def propose_fix(state: IncidentState) -> dict:
     incident = state.get("incident", {})
     evidence_text = "\n\n".join(f"[{e['tool']}]\n{e['result']}" for e in state.get("evidence", []))
     system = (
-        "Eres un ingeniero DevOps senior. Propón un plan de corrección claro para el incidente. "
-        "Si la acción es de alto riesgo (reiniciar producción, escalar, cambiar config crítica), "
-        "marca needs_approval como true. Responde SOLO con JSON: "
-        '{"fix": "<pasos de la corrección>", "fix_risk": "low|medium|high", '
-        '"needs_approval": true|false, "pending_checks": ["<check 1>"]}'
+        "Eres un ingeniero DevOps senior proponiendo una corrección para un incidente.\n\n"
+        "REGLAS IMPORTANTES:\n"
+        "- Si hay un runbook en la evidencia, SUS PASOS son la base de la corrección. "
+        "No inventes pasos que no estén en el runbook.\n"
+        "- Si el runbook no cubre exactamente este caso, adáptalo a la situación actual.\n"
+        "- Si no hay runbook, usa las mejores prácticas de la industria.\n"
+        "- Marca needs_approval=true si la acción es de alto riesgo: "
+        "reiniciar producción, escalar infraestructura, modificar configs de seguridad, "
+        "o cualquier cambio que no se pueda revertir fácilmente.\n\n"
+        "Responde SOLO con JSON:\n"
+        '{"fix": "<pasos concretos de la corrección, numerados>", '
+        '"fix_risk": "low|medium|high", '
+        '"needs_approval": true|false, '
+        '"runbook_followed": "<título del runbook seguido, o null>", '
+        '"pending_checks": ["<check 1>"]}'
     )
     prompt = (
         f"Incidente: {incident.get('description', '')}\n"
-        f"Hipótesis: {state.get('hypothesis')}\n\nEvidencia:\n{evidence_text[:3000]}\n\n"
-        f"Runbooks relevantes encontrados.\nContexto conversación:\n{_conversation_context(state)}"
+        f"Hipótesis: {state.get('hypothesis')}\n\n"
+        f"Evidencia recopilada:\n{evidence_text[:3000]}\n\n"
+        f"Contexto conversación:\n{_conversation_context(state)}"
     )
     data = _parse_json(_chat(system, prompt))
     if not data:
@@ -332,10 +364,19 @@ def propose_fix(state: IncidentState) -> dict:
 def verify(state: IncidentState) -> dict:
     incident = state.get("incident", {})
     system = (
-        "Define cómo verificar que el fix propuesto resuelve el incidente y emite un veredicto. "
-        "Responde SOLO con JSON: "
+        "Eres un ingeniero DevOps verificando que un fix resolvió un incidente.\n\n"
+        "Define pasos concretos de verificación:\n"
+        "1. Qué métricas monitorear (latencia, error rate, conexiones, etc.)\n"
+        "2. Cuánto tiempo monitorear (mínimo 15 minutos para cambios de config)\n"
+        "3. Qué umbral confirma que el fix funcionó\n\n"
+        "El veredicto debe ser:\n"
+        "- confirmed: la evidencia respalda firmemente que el fix funcionará\n"
+        "- uncertain: falta información o la evidencia es ambigua\n"
+        "- refuted: la evidencia contradice el fix propuesto\n\n"
+        "Responde SOLO con JSON:\n"
         '{"verification": "<pasos concretos de verificación>", '
-        '"verdict": "confirmed|uncertain|refuted", "pending_checks": ["<check 1>"]}'
+        '"verdict": "confirmed|uncertain|refuted", '
+        '"pending_checks": ["<check 1>"]}'
     )
     prompt = (
         f"Incidente: {incident.get('description', '')}\n"
@@ -367,12 +408,32 @@ def finish(state: IncidentState) -> dict:
             result = result[:180] + "..."
         evidence_lines.append(f"- [{e['tool']}] {result}")
 
-    summary = "\n".join([
+    # Detectar si se usaron runbooks o postmortems.
+    runbook_used = any("runbook" in e["tool"].lower() for e in state.get("evidence", []))
+    runbook_found = any(
+        "título:" in e["result"].lower() and "pasos:" in e["result"].lower()
+        for e in state.get("evidence", [])
+        if e["tool"] == "search_runbook"
+    )
+
+    sources = []
+    if runbook_found:
+        sources.append("Runbooks de la KB")
+    if any(e["tool"] == "search_similar_incidents" and "Título:" in e["result"] for e in state.get("evidence", [])):
+        sources.append("Postmortems anteriores")
+
+    summary_parts = [
         f"INCIDENTE: {incident.get('title', 'Sin título')} (id {incident.get('id', 'N/A')})",
         "",
         f"SEVERIDAD: {state.get('severity', 'N/A').upper()} | EQUIPO RESPONSABLE: {state.get('owner_team', 'N/A')}",
         "",
         f"HIPÓTESIS: {state.get('hypothesis', 'N/A')}",
+    ]
+
+    if sources:
+        summary_parts.extend(["", f"FUENTES CONSULTADAS: {', '.join(sources)}"])
+
+    summary_parts.extend([
         "",
         f"EVIDENCIA:\n" + ("\n".join(evidence_lines) if evidence_lines else "Sin evidencia recopilada."),
         "",
@@ -382,7 +443,8 @@ def finish(state: IncidentState) -> dict:
         "",
         f"CHECKS PENDIENTES:\n" + ("\n".join(f"- {c}" for c in state.get("pending_checks", [])) or "- Ninguno."),
     ])
-    return {"summary": summary}
+
+    return {"summary": "\n".join(summary_parts)}
 
 
 def handle_error(state: IncidentState) -> dict:
