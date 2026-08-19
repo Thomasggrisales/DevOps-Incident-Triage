@@ -22,7 +22,7 @@ from app.db import models
 @tool
 def search_runbook(query: str, limit: int = 3) -> str:
     """Busca runbooks o documentos operativos relevantes en la base de datos vectorial."""
-    from weaviate.classes.query import HybridFusion
+    from weaviate.classes.query import HybridFusion, MetadataQuery
 
     client = None
     try:
@@ -38,7 +38,7 @@ def search_runbook(query: str, limit: int = 3) -> str:
             limit=limit,
             alpha=0.7,
             fusion_type=HybridFusion.RELATIVE_SCORE,
-            return_metadata={"distance": True},
+            return_metadata=MetadataQuery(distance=True),
         )
 
         blocks = []
@@ -79,7 +79,7 @@ def fetch_service_metrics(service: str, seed: int = 0) -> str:
 @tool
 def search_similar_incidents(query: str, limit: int = 3) -> str:
     """Busca incidentes históricos similares para reutilizar soluciones anteriores."""
-    from weaviate.classes.query import HybridFusion
+    from weaviate.classes.query import HybridFusion, MetadataQuery
     from app.services.incident import get_embedding_local
 
     client = None
@@ -97,7 +97,7 @@ def search_similar_incidents(query: str, limit: int = 3) -> str:
             limit=limit,
             alpha=0.7,
             fusion_type=HybridFusion.RELATIVE_SCORE,
-            return_metadata={"distance": True},
+            return_metadata=MetadataQuery(distance=True),
         )
 
         if not response.objects:
