@@ -7,6 +7,12 @@ del incidente (capa de observabilidad de bajo costo sin dependencias extra).
 from langchain_core.tools import tool
 
 from app.services.simulator import get_service_logs, get_service_metrics, SERVICE_LIST
+from app.services.diagnostics import (
+    fetch_deployment_history,
+    check_service_health,
+    get_alert_history,
+    query_database,
+)
 from app.services.incident import get_embedding_local
 from app.db.weaviate_client import get_weaviate_client
 from app.db.database import SessionLocal
@@ -106,6 +112,30 @@ def update_incident_status(incident_id: int, new_status: str) -> str:
         return f"Error actualizando el estado: {e}"
     finally:
         db.close()
+
+
+@tool
+def fetch_deployment_history_tool(service: str, limit: int = 5, seed: int = 0) -> str:
+    """Revisa los últimos despliegues del servicio para detectar el cambio que pudo causar el incidente."""
+    return fetch_deployment_history(service, limit=limit, seed=seed)
+
+
+@tool
+def check_service_health_tool(service: str, seed: int = 0) -> str:
+    """Consulta el estado de salud actual del servicio (healthy, degraded o down)."""
+    return check_service_health(service, seed=seed)
+
+
+@tool
+def get_alert_history_tool(service: str, minutes: int = 180, seed: int = 0) -> str:
+    """Consulta el historial de alertas recientes de un servicio."""
+    return get_alert_history(service, minutes=minutes, seed=seed)
+
+
+@tool
+def query_database_tool(query: str) -> str:
+    """Ejecuta una consulta SELECT de solo lectura sobre la base de datos de la aplicación."""
+    return query_database(query)
 
 
 def available_service_hint() -> str:
