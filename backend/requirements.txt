@@ -3,11 +3,11 @@ fastapi==0.110.0
 uvicorn==0.27.1
 
 # IA Y ORQUESTACIÓN 
-langchain==0.3.25
-langchain-community==0.3.21
-langchain-core==1.5.3
-langgraph==1.2.10
-langchain-ollama==1.1.0
+langchain
+langchain-community
+langchain-core
+langgraph
+langchain-ollama
 
 # OBSERVABILIDAD (trazabilidad del agente)
 langfuse>=3.0.0
