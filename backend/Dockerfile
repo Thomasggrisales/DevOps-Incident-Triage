@@ -5,7 +5,7 @@ WORKDIR /app
 
 # Dependencias de compilación para paquetes como cryptography, bcrypt, etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc libffi-dev libpq-dev && \
+    gcc libffi-dev libpq-dev git && \
     rm -rf /var/lib/apt/lists/*
 
 # Copiamos el archivo de dependencias primero (para optimizar la caché de Docker)
