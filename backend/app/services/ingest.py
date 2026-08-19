@@ -20,6 +20,7 @@ from app.db.weaviate_client import get_weaviate_client
 from app.services.incident import get_embedding_local
 
 DOCS_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "docs")
+SCRAPER_CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "..", ".scraper_cache", "scraped_docs")
 MAX_CHUNK_CHARS = 1500
 CHUNK_OVERLAP = 200
 
@@ -55,7 +56,7 @@ def _chunk_text(text: str, max_chars: int = MAX_CHUNK_CHARS, overlap: int = CHUN
 
 
 def _load_documents(docs_dir: str) -> list[dict]:
-    """Carga todos los archivos .md del directorio docs/ con su frontmatter."""
+    """Carga todos los archivos .md del directorio docs/ y del scraper cache."""
     documents = []
     patterns = ["runbooks/*.md", "postmortems/*.md"]
 
@@ -87,6 +88,40 @@ def _load_documents(docs_dir: str) -> list[dict]:
                     "doc_type": doc_type,
                     "source_file": os.path.basename(filepath),
                 })
+    
+    # Cargar documentos scrapeados del cache
+    if os.path.exists(SCRAPER_CACHE_DIR):
+        for filepath in glob.glob(os.path.join(SCRAPER_CACHE_DIR, "*.md")):
+            try:
+                with open(filepath, encoding="utf-8") as f:
+                    post = frontmatter.load(f)
+                
+                title = post.metadata.get("title", os.path.basename(filepath))
+                doc_type = post.metadata.get("doc_type", "runbook")
+                symptoms = post.metadata.get("symptoms", "")
+                severity = post.metadata.get("severity", "medium")
+                source = post.metadata.get("source", "web")
+                body = post.content.strip()
+                
+                if not body:
+                    continue
+                
+                chunks = _chunk_text(body)
+                for i, chunk in enumerate(chunks):
+                    documents.append({
+                        "title": title,
+                        "chunk_index": i,
+                        "total_chunks": len(chunks),
+                        "applies_to": source,
+                        "severity": severity,
+                        "symptoms": symptoms if isinstance(symptoms, str) else str(symptoms),
+                        "body": chunk,
+                        "doc_type": doc_type,
+                        "source_file": f"scraped_{os.path.basename(filepath)}",
+                    })
+            except Exception as e:
+                print(f"  [ERROR] Error cargando {filepath}: {e}")
+    
     return documents
 
 
@@ -189,7 +224,37 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Ingesta documentos en Weaviate")
     parser.add_argument("--force", action="store_true", help="Re-indexa todo borrando los existentes")
     parser.add_argument("--dir", default=DOCS_DIR, help="Directorio de docs (default: backend/docs/)")
+    parser.add_argument("--scrape-github", nargs="+", help="Repositorios de GitHub a scrapeear (formato: owner/repo)")
+    parser.add_argument("--scrape-statuspage", nargs="+", help="URLs de status pages a scrapeear")
+    parser.add_argument("--scrape-method", choices=["git", "api"], default="git",
+                        help="Método para GitHub scraping: 'git' (default, sin rate limit) o 'api'")
+    parser.add_argument("--skip-scrape", action="store_true", help="Omitir ingesta de documentos scrapeados")
     args = parser.parse_args()
 
+    # Scraping de fuentes web si se solicita
+    if args.scrape_github or args.scrape_statuspage:
+        from app.services.scraper import scrape_github_repo, scrape_status_page, save_scraped_documents
+        
+        all_docs = []
+        
+        if args.scrape_github:
+            for repo in args.scrape_github:
+                print(f"\nScrapeando repositorio: {repo} (método: {args.scrape_method})")
+                docs = scrape_github_repo(repo, method=args.scrape_method)
+                print(f"  Encontrados {len(docs)} documentos")
+                all_docs.extend(docs)
+        
+        if args.scrape_statuspage:
+            for url in args.scrape_statuspage:
+                print(f"\nScrapeando status page: {url}")
+                docs = scrape_status_page(url)
+                print(f"  Encontrados {len(docs)} incidentes")
+                all_docs.extend(docs)
+        
+        if all_docs:
+            output_dir = save_scraped_documents(all_docs)
+            print(f"\nDocumentos scrapeados guardados en: {output_dir}")
+
+    # Ingesta en Weaviate
     result = ingest_documents(docs_dir=args.dir, force=args.force)
     print(result)
