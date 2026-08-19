@@ -356,7 +356,7 @@ def propose_fix(state: IncidentState) -> dict:
     return {
         "fix": data.get("fix", ""),
         "fix_risk": data.get("fix_risk", "medium"),
-        "needs_approval": bool(data.get("needs_approval", True)),
+        "needs_approval": True,
         "pending_checks": data.get("pending_checks", state.get("pending_checks", [])),
     }
 
