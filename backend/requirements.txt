@@ -1,6 +1,6 @@
 # FRAMEWORK WEB 
-fastapi==0.110.0
-uvicorn==0.27.1
+fastapi
+uvicorn
 
 # IA Y ORQUESTACIÓN 
 langchain
@@ -10,32 +10,32 @@ langgraph
 langchain-ollama
 
 # OBSERVABILIDAD (trazabilidad del agente)
-langfuse>=3.0.0
+langfuse
 
 # BASE DE DATOS VECTORIAL 
-weaviate-client==4.5.4
+weaviate-client
 
 # MCP (Model Context Protocol): server y adaptadores para LangChain
-mcp==1.29.0
-langchain-mcp-adapters==0.3.2
+mcp
+langchain-mcp-adapters
 
 # UTILIDADES 
-python-dotenv==1.0.1
-pydantic==2.7.4
-pydantic-settings==2.2.1
-email-validator==2.1.1
-python-frontmatter==1.3.0
+python-dotenv
+pydantic
+pydantic-settings
+email-validator
+python-frontmatter
 
 # BASE DE DATOS RELACIONAL 
-sqlalchemy==2.0.28
-psycopg2-binary==2.9.9
+sqlalchemy
+psycopg2-binary
 
 # CHECKPOINTS DEL AGENTE EN POSTGRES
 langgraph-checkpoint-postgres
 psycopg[binary]
 
 # SEGURIDAD Y AUTENTICACIÓN
-passlib[bcrypt]==1.7.4
-bcrypt==3.2.2
-PyJWT==2.8.0
-python-multipart==0.0.9
+passlib[bcrypt]
+bcrypt
+PyJWT
+python-multipart
