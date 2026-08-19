@@ -22,6 +22,8 @@ from app.db import models
 @tool
 def search_runbook(query: str, limit: int = 3) -> str:
     """Busca runbooks o documentos operativos relevantes en la base de datos vectorial."""
+    from weaviate.classes.query import HybridFusion
+
     client = None
     try:
         client = get_weaviate_client()
@@ -30,12 +32,22 @@ def search_runbook(query: str, limit: int = 3) -> str:
         if not query_vector:
             return "No se pudo generar el vector de búsqueda para los runbooks."
 
-        response = collection.query.near_vector(near_vector=query_vector, limit=limit)
+        response = collection.query.hybrid(
+            query=query,
+            vector=query_vector,
+            limit=limit,
+            alpha=0.7,
+            fusion_type=HybridFusion.RELATIVE_SCORE,
+            return_metadata={"distance": True},
+        )
+
         blocks = []
         for obj in response.objects:
             p = obj.properties
+            distance = obj.metadata.distance if obj.metadata else None
+            score_info = f" (score: {1 - distance:.2f})" if distance is not None else ""
             blocks.append(
-                f"Título: {p.get('title')}\n"
+                f"Título: {p.get('title')}{score_info}\n"
                 f"Aplica a: {p.get('applies_to')}\n"
                 f"Síntomas: {p.get('symptoms')}\n"
                 f"Pasos: {p.get('steps')}"
@@ -67,22 +79,46 @@ def fetch_service_metrics(service: str, seed: int = 0) -> str:
 @tool
 def search_similar_incidents(query: str, limit: int = 3) -> str:
     """Busca incidentes históricos similares para reutilizar soluciones anteriores."""
-    from app.services.incident import search_incidents_semantic
+    from weaviate.classes.query import HybridFusion
+    from app.services.incident import get_embedding_local
 
+    client = None
     try:
-        results = search_incidents_semantic(query, limit=limit)
-        if not results:
+        client = get_weaviate_client()
+        incidents_collection = client.collections.get("Incident")
+        query_vector = get_embedding_local(query)
+
+        if not query_vector:
+            return "No se pudo generar el vector para buscar incidentes similares."
+
+        response = incidents_collection.query.hybrid(
+            query=query,
+            vector=query_vector,
+            limit=limit,
+            alpha=0.7,
+            fusion_type=HybridFusion.RELATIVE_SCORE,
+            return_metadata={"distance": True},
+        )
+
+        if not response.objects:
             return "Sin incidentes históricos similares."
+
         blocks = []
-        for inc in results:
+        for obj in response.objects:
+            p = obj.properties
+            distance = obj.metadata.distance if obj.metadata else None
+            score_info = f" (score: {1 - distance:.2f})" if distance is not None else ""
             blocks.append(
-                f"Título: {inc.get('title')}\n"
-                f"Estado: {inc.get('status')}\n"
-                f"Descripción: {inc.get('description')}"
+                f"Título: {p.get('title', 'Sin título')}{score_info}\n"
+                f"Estado: {p.get('status', 'Sin estado')}\n"
+                f"Descripción: {p.get('description', 'Sin descripción')}"
             )
         return "\n\n---\n\n".join(blocks)
     except Exception as e:
         return f"Error buscando incidentes similares: {e}"
+    finally:
+        if client:
+            client.close()
 
 
 @tool
