@@ -4,7 +4,6 @@ uvicorn==0.27.1
 
 # IA Y ORQUESTACIÓN 
 langchain==0.3.25
-langchain-huggingface==0.1.2
 langchain-community==0.3.21
 langchain-core==1.5.3
 langgraph==1.2.10
