@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, type FormEvent, type KeyboardEvent, type ChangeEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import softserveLogo from '../assets/softserve.png';
 import { apiFetch } from '../api';
@@ -19,6 +19,15 @@ interface AgentState {
   verdict?: string;
 }
 
+interface IncidentInfo {
+  id: number;
+  title: string;
+  severity: string;
+  status: string;
+  source: string;
+  created_at: string | null;
+}
+
 interface ChatMessage {
   role: 'user' | 'agent';
   text: string;
@@ -30,6 +39,8 @@ interface ChatMessage {
 }
 
 export default function Chat() {
+  const { incidentId } = useParams<{ incidentId: string }>();
+  const [incidentInfo, setIncidentInfo] = useState<IncidentInfo | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([
     { role: 'agent', text: '¡Hola! Soy el Copilot de Triage DevOps. Envíame una alerta o descripción de incidente y lo clasificaré, investigaré con logs/métricas, propondré un fix y lo verificaré.' }
   ]);
@@ -48,6 +59,37 @@ export default function Chat() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, agentState]);
+
+  useEffect(() => {
+    if (!incidentId) return;
+
+    const loadSession = async () => {
+      try {
+        const response = await apiFetch(`/incidents/${incidentId}/session`);
+        if (!response.ok) return;
+        const data = await response.json();
+
+        setIncidentInfo(data.incident);
+        setSessionId(data.session_id);
+
+        if (data.messages && data.messages.length > 0) {
+          const historyMessages: ChatMessage[] = data.messages.map((m: { role: string; text: string; sessionId?: string }) => ({
+            role: m.role as 'user' | 'agent',
+            text: m.text,
+            sessionId: m.sessionId || data.session_id,
+          }));
+          setMessages([
+            { role: 'agent', text: '¡Hola! Soy el Copilot de Triage DevOps. Continuemos con el análisis de este incidente.' },
+            ...historyMessages,
+          ]);
+        }
+      } catch {
+        // Silently fail - chat works without preloaded session
+      }
+    };
+
+    loadSession();
+  }, [incidentId]);
 
   // Registra la decisión humana sobre el fix propuesto por el agente.
   const handleApproval = async (index: number, decision: 'approved' | 'rejected') => {
@@ -222,24 +264,63 @@ export default function Chat() {
           />
 
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-white tracking-tight">Copilot de Incidentes</h2>
-            <p className="text-sm text-gray-400 flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-              </span>
-              Conectado a Weaviate Vector DB
-            </p>
+            {incidentInfo ? (
+              <>
+                <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-3">
+                  <span className="text-gray-400 text-sm font-mono">#{incidentInfo.id}</span>
+                  {incidentInfo.title}
+                </h2>
+                <p className="text-sm text-gray-400 flex items-center gap-3 mt-0.5">
+                  <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    incidentInfo.severity === 'critical' ? 'bg-red-500/20 text-red-300'
+                    : incidentInfo.severity === 'high' ? 'bg-orange-500/20 text-orange-300'
+                    : incidentInfo.severity === 'medium' ? 'bg-yellow-500/20 text-yellow-300'
+                    : 'bg-blue-500/20 text-blue-300'
+                  }`}>
+                    {incidentInfo.severity}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                    incidentInfo.status === 'resolved' ? 'bg-green-500/20 text-green-300'
+                    : incidentInfo.status === 'open' ? 'bg-red-500/20 text-red-300'
+                    : 'bg-amber-500/20 text-amber-300'
+                  }`}>
+                    {incidentInfo.status}
+                  </span>
+                  <span>{incidentInfo.source}</span>
+                </p>
+              </>
+            ) : (
+              <>
+                <h2 className="text-xl font-bold text-white tracking-tight">Copilot de Incidentes</h2>
+                <p className="text-sm text-gray-400 flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                  </span>
+                  Conectado a Weaviate Vector DB
+                </p>
+              </>
+            )}
           </div>
 
-          {sessionId && (
-            <button
-              onClick={startNewSession}
-              className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
-            >
-              Nueva sesión
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {incidentInfo && (
+              <button
+                onClick={() => navigate('/incidents')}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Volver
+              </button>
+            )}
+            {sessionId && (
+              <button
+                onClick={startNewSession}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                Nueva sesión
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-1 overflow-hidden">

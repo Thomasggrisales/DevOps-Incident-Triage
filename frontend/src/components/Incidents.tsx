@@ -274,7 +274,7 @@ export default function Incidents() {
               </thead>
               <tbody>
                 {paginatedIncidents.map((inc) => (
-                  <tr key={inc.id} className="border-b border-white/5 transition-colors last:border-0 hover:bg-white/5">
+                  <tr key={inc.id} onClick={() => navigate(`/chat/${inc.id}`)} className="border-b border-white/5 transition-colors last:border-0 hover:bg-white/5 cursor-pointer">
                     <td className="px-6 py-3 text-gray-400">#{inc.id}</td>
                     <td className="max-w-[340px] truncate px-4 py-3 text-gray-200">{inc.title}</td>
                     <td className="px-4 py-3">

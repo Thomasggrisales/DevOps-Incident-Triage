@@ -122,6 +122,70 @@ def get_incident(
         )
     return db_incident
 
+
+@router.get("/{incident_id}/session")
+def get_or_create_session(
+    incident_id: int,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Busca o crea una sesión de agente para un incidente dado."""
+    incident = incident_service.get_incident_by_id(db=db, incident_id=incident_id)
+    if not incident:
+        raise HTTPException(status_code=404, detail="El incidente no existe.")
+
+    session = (
+        db.query(models.AgentSession)
+        .filter(models.AgentSession.incident_id == incident_id)
+        .order_by(models.AgentSession.created_at.desc())
+        .first()
+    )
+
+    if not session:
+        title = incident.title[:80]
+        session = models.AgentSession(
+            id=str(uuid4()),
+            incident_id=incident.id,
+            title=title,
+            status="active",
+            conversation=[],
+        )
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+    conversation = session.conversation or []
+    history_msgs: list[ChatMessage] = []
+    for msg in conversation:
+        role = msg.get("role", "agent")
+        content = msg.get("content", "")
+        if not content:
+            continue
+        history_msgs.append(ChatMessage(
+            role=role,
+            text=content,
+            sessionId=session.id,
+        ))
+
+    return {
+        "session_id": session.id,
+        "incident": {
+            "id": incident.id,
+            "title": incident.title,
+            "severity": incident.severity,
+            "status": incident.status,
+            "source": incident.source,
+            "created_at": incident.created_at.isoformat() if incident.created_at else None,
+        },
+        "messages": history_msgs,
+    }
+
+
+class ChatMessage(BaseModel):
+    role: str
+    text: str
+    sessionId: str | None = None
+
 class ChatRequest(BaseModel):
     question: str
     session_id: str | None = None
