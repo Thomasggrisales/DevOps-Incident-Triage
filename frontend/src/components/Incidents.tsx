@@ -14,17 +14,16 @@ interface Incident {
   created_at: string;
 }
 
-const STATUS_ORDER = ['open', 'investigating', 'resolved', 'closed'];
+const STATUS_ORDER = ['open', 'investigating', 'resolved'];
 
 const STATUS_LABELS: Record<string, string> = {
-  open: 'Abiertos', investigating: 'En investigación', resolved: 'Resueltos', closed: 'Cerrados',
+  open: 'Abiertos', investigating: 'En investigación', resolved: 'Resueltos',
 };
 
 const STATUS_BADGE: Record<string, string> = {
   open: 'bg-rose-500/20 text-rose-300',
   investigating: 'bg-amber-500/20 text-amber-300',
   resolved: 'bg-green-500/20 text-green-300',
-  closed: 'bg-gray-500/20 text-gray-300',
 };
 
 const SEVERITY_BADGE: Record<string, string> = {

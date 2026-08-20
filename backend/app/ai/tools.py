@@ -115,9 +115,9 @@ def search_similar_incidents(query: str, limit: int = 3) -> str:
 
 @tool
 def update_incident_status(incident_id: int, new_status: str) -> str:
-    """Actualiza el estado del incidente en el sistema (open, investigating, resolved, closed)."""
-    if new_status not in {"open", "investigating", "resolved", "closed"}:
-        return f"Estado inválido '{new_status}'. Valores permitidos: open, investigating, resolved, closed."
+    """Actualiza el estado del incidente en el sistema (open, investigating, resolved)."""
+    if new_status not in {"open", "investigating", "resolved"}:
+        return f"Estado inválido '{new_status}'. Valores permitidos: open, investigating, resolved."
 
     db = SessionLocal()
     try:
