@@ -57,7 +57,7 @@ def incident_stats(
     resolution_rate = round(resolved / total * 100, 1) if total else 0.0
     critical_active = sum(
         1 for inc in incidents
-        if inc.severity == "critical" and inc.status not in ("resolved", "closed")
+        if inc.severity == "critical" and inc.status not in ("resolved",)
     )
 
     # MTTR: promedio de horas entre created_at y el primer cambio a "resolved".

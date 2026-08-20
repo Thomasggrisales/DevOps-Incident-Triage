@@ -46,7 +46,7 @@ def search_similar_incidents(query: str, limit: int = 3) -> str:
 
 @mcp.tool()
 def update_incident_status(incident_id: int, new_status: str) -> str:
-    """Actualiza el estado de un incidente (open, investigating, resolved, closed)."""
+    """Actualiza el estado de un incidente (open, investigating, resolved)."""
     return agent_tools.update_incident_status.invoke(
         {"incident_id": incident_id, "new_status": new_status}
     )

@@ -23,12 +23,12 @@ const SEVERITY_COLORS: Record<string, string> = {
   critical: 'bg-red-500', high: 'bg-orange-500', medium: 'bg-yellow-500', low: 'bg-blue-500', pending: 'bg-gray-500',
 };
 
-const STATUS_ORDER = ['open', 'investigating', 'resolved', 'closed'];
+const STATUS_ORDER = ['open', 'investigating', 'resolved'];
 const STATUS_LABELS: Record<string, string> = {
-  open: 'Abiertos', investigating: 'En investigación', resolved: 'Resueltos', closed: 'Cerrados',
+  open: 'Abiertos', investigating: 'En investigación', resolved: 'Resueltos',
 };
 const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-rose-500', investigating: 'bg-amber-500', resolved: 'bg-green-500', closed: 'bg-gray-400',
+  open: 'bg-rose-500', investigating: 'bg-amber-500', resolved: 'bg-green-500',
 };
 
 interface BarDatum { label: string; value: number; color: string }

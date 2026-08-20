@@ -127,11 +127,11 @@ def query_database(query: str) -> str:
             (1, "Alta latencia en payments-api", "critical", "open"),
             (2, "Pool de conexiones agotado en db-primary", "high", "investigating"),
             (3, "504 en api-gateway", "high", "resolved"),
-            (4, "JWT validation failures masivos", "medium", "closed"),
+            (4, "JWT validation failures masivos", "medium", "open"),
         ]
         if "where status" in lower:
             state = lower.split("status")[-1]
-            wanted = next((s for s in ("open", "investigating", "resolved", "closed") if s in state), None)
+            wanted = next((s for s in ("open", "investigating", "resolved") if s in state), None)
             if wanted:
                 rows = [r for r in rows if r[3] == wanted]
         lines = ["id | titulo | severidad | estado"]
