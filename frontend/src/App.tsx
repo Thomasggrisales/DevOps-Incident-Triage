@@ -16,6 +16,7 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/incidents" element={<Incidents />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/chat/:incidentId" element={<Chat />} />
 
         {/* Redirigir cualquier ruta desconocida al login por ahora */}
         <Route path="*" element={<Navigate to="/login" replace />} />
