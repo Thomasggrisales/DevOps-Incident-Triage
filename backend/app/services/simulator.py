@@ -10,6 +10,31 @@ from datetime import datetime, timedelta, timezone
 
 SERVICE_LIST = ["api-gateway", "auth-service", "database", "worker", "frontend", "cache"]
 
+# Mapeo de aliases a servicios reales
+SERVICE_ALIASES = {
+    "backend": "api-gateway",
+    "api": "api-gateway",
+    "servidor": "api-gateway",
+    "bd": "database",
+    "base de datos": "database",
+    "postgres": "database",
+    "sql": "database",
+    "redis": "cache",
+    "ui": "frontend",
+    "interfaz": "frontend",
+    "proceso": "worker",
+    "job": "worker",
+    "tarea": "worker",
+}
+
+
+def _resolve_service(service: str) -> str:
+    """Resuelve aliases de servicios a nombres reales."""
+    service_lower = service.lower().strip()
+    if service_lower in SERVICE_LIST:
+        return service_lower
+    return SERVICE_ALIASES.get(service_lower, service_lower)
+
 # Patrones de falla conocidos por servicio. Se eligen según el `seed` para
 # que la evidencia sea estable y reproducible para un mismo incidente.
 FAILURE_PATTERNS = {
@@ -70,6 +95,7 @@ def _format_log(line: tuple, rng: random.Random, ts: datetime) -> str:
 
 def get_service_logs(service: str, minutes: int = 60, seed: int = 0) -> list[str]:
     """Devuelve logs simulados para un servicio durante los últimos `minutes`."""
+    service = _resolve_service(service)
     if service not in SERVICE_LIST:
         return [f"Servicio '{service}' no encontrado en el sistema simulado."]
 
@@ -89,6 +115,7 @@ def get_service_logs(service: str, minutes: int = 60, seed: int = 0) -> list[str
 
 def get_service_metrics(service: str, seed: int = 0) -> dict:
     """Devuelve métricas simuladas para un servicio."""
+    service = _resolve_service(service)
     if service not in SERVICE_LIST:
         return {"error": f"Servicio '{service}' no encontrado."}
 
