@@ -211,9 +211,6 @@ def ingest_documents(docs_dir: str = DOCS_DIR, force: bool = False) -> dict:
                 print(f"  [ERROR] {doc['title']}: {e}")
                 stats["errors"] += 1
 
-    finally:
-        client.close()
-
     print(f"\nIngesta completada: {stats['runbooks']} runbooks, {stats['postmortems']} postmortems, {stats['errors']} errores.")
     return stats
 

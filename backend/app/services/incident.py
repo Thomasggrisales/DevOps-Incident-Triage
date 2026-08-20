@@ -83,9 +83,6 @@ def create_new_incident(db: Session, incident_in: IncidentCreate) -> Incident:
     except Exception as e:
         print(f"Error indexando en Weaviate: {e}")
         # No hacemos raise para que el usuario reciba su incidente creado en Postgres
-    finally:
-        if client:
-            client.close()
         
     return db_incident
 
@@ -145,6 +142,3 @@ def search_incidents_semantic(query: str, limit: int = 3):
     except Exception as e:
         print(f"Error en la búsqueda semántica: {e}")
         return []
-    finally:
-        if client:
-            client.close()
