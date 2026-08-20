@@ -73,10 +73,17 @@ export default function Chat() {
         setSessionId(data.session_id);
 
         if (data.messages && data.messages.length > 0) {
-          const historyMessages: ChatMessage[] = data.messages.map((m: { role: string; text: string; sessionId?: string }) => ({
+          const historyMessages: ChatMessage[] = data.messages.map((m: {
+            role: string; text: string; sessionId?: string;
+            needsApproval?: boolean | null; fix?: string | null; fixRisk?: string | null;
+          }) => ({
             role: m.role as 'user' | 'agent',
             text: m.text,
             sessionId: m.sessionId || data.session_id,
+            needsApproval: m.needsApproval || undefined,
+            fix: m.fix || undefined,
+            fixRisk: m.fixRisk || undefined,
+            approvalStatus: null,
           }));
           setMessages([
             { role: 'agent', text: '¡Hola! Soy el Copilot de Triage DevOps. Continuemos con el análisis de este incidente.' },
@@ -128,7 +135,11 @@ export default function Chat() {
     try {
       const response = await apiFetch('/incidents/chat/', {
         method: 'POST',
-        body: JSON.stringify({ question: userMessage, session_id: sessionId }),
+        body: JSON.stringify({
+          question: userMessage,
+          session_id: sessionId,
+          incident_id: incidentId ? parseInt(incidentId) : undefined,
+        }),
       });
 
       const data = await response.json();

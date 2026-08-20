@@ -165,6 +165,9 @@ def get_or_create_session(
             role=role,
             text=content,
             sessionId=session.id,
+            needsApproval=msg.get("needs_approval"),
+            fix=msg.get("fix"),
+            fixRisk=msg.get("fix_risk"),
         ))
 
     return {
@@ -185,10 +188,14 @@ class ChatMessage(BaseModel):
     role: str
     text: str
     sessionId: str | None = None
+    needsApproval: bool | None = None
+    fix: str | None = None
+    fixRisk: str | None = None
 
 class ChatRequest(BaseModel):
     question: str
     session_id: str | None = None
+    incident_id: int | None = None
 
 
 class ApprovalRequest(BaseModel):
@@ -306,7 +313,7 @@ def chat_with_assistant(
             ).first()
             if not session:
                 raise HTTPException(status_code=404, detail="La sesión no existe o fue cerrada.")
-            if _looks_like_new_incident(request.question):
+            if not request.incident_id and _looks_like_new_incident(request.question):
                 # El usuario describió otro incidente: nueva sesión, sin contexto previo.
                 session, incident = _start_new_session(db, request.question)
                 new_session = True
@@ -357,9 +364,14 @@ def chat_with_assistant(
             result = agent_graph.invoke(initial_state, config=config)
 
         # Persistir la conversación y actualizar severidad/estado del incidente.
-        conversation = initial_state["messages"] + [
-            {"role": "agent", "content": result.get("summary", "")}
-        ]
+        agent_msg = {
+            "role": "agent",
+            "content": result.get("summary", ""),
+            "needs_approval": result.get("needs_approval", False),
+            "fix": result.get("fix", ""),
+            "fix_risk": result.get("fix_risk", ""),
+        }
+        conversation = initial_state["messages"] + [agent_msg]
         session.conversation = conversation
         db.add(session)
 
