@@ -26,7 +26,7 @@ def get_embedding_local(text: str) -> list:
         return []
 
 def get_incidents(db: Session, skip: int = 0, limit: int = 100) -> list[Incident]:
-    return db.query(Incident).offset(skip).limit(limit).all()
+    return db.query(Incident).order_by(Incident.id.desc()).offset(skip).limit(limit).all()
 
 def get_incident_by_id(db: Session, incident_id: int) -> Incident | None:
     return db.query(Incident).filter(Incident.id == incident_id).first()
