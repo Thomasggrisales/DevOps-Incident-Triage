@@ -11,7 +11,7 @@ evidencia sea reproducible para un mismo incidente.
 import random
 from datetime import datetime, timedelta, timezone
 
-from app.services.simulator import SERVICE_LIST
+from app.services.simulator import SERVICE_LIST, _resolve_service
 
 # Cambio de configuración que suele acompañar al despliegue degradante.
 DEPLOY_IMPACT = {
@@ -35,15 +35,21 @@ ALERT_MESSAGES = {
 ALLOWED_TABLES = {"incidents", "status_history", "users", "agent_sessions"}
 
 
-def _service_guard(service: str) -> str | None:
-    if service not in SERVICE_LIST:
-        return f"Servicio '{service}' no encontrado en el sistema simulado."
-    return None
+def _service_guard(service: str) -> tuple[str, str | None]:
+    """Resuelve el nombre del servicio y verifica que exista.
+    
+    Returns:
+        Tupla de (servicio_resuelto, error_o_None)
+    """
+    resolved = _resolve_service(service)
+    if resolved not in SERVICE_LIST:
+        return resolved, f"Servicio '{service}' no encontrado en el sistema simulado."
+    return resolved, None
 
 
 def fetch_deployment_history(service: str, limit: int = 5, seed: int = 0) -> str:
     """Devuelve el historial de despliegues recientes de un servicio."""
-    guard = _service_guard(service)
+    service, guard = _service_guard(service)
     if guard:
         return guard
 
@@ -69,7 +75,7 @@ def fetch_deployment_history(service: str, limit: int = 5, seed: int = 0) -> str
 
 def check_service_health(service: str, seed: int = 0) -> str:
     """Devuelve el estado de salud actual de un servicio (healthy/degraded/down)."""
-    guard = _service_guard(service)
+    service, guard = _service_guard(service)
     if guard:
         return guard
 
@@ -89,7 +95,7 @@ def check_service_health(service: str, seed: int = 0) -> str:
 
 def get_alert_history(service: str, minutes: int = 180, seed: int = 0) -> str:
     """Devuelve las alertas recientes de un servicio en la ventana solicitada."""
-    guard = _service_guard(service)
+    service, guard = _service_guard(service)
     if guard:
         return guard
 
