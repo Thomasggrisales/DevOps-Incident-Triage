@@ -24,7 +24,6 @@ def search_runbook(query: str, limit: int = 3) -> str:
     """Busca runbooks o documentos operativos relevantes en la base de datos vectorial."""
     from weaviate.classes.query import HybridFusion, MetadataQuery
 
-    client = None
     try:
         client = get_weaviate_client()
         collection = client.collections.get("Runbook")
@@ -55,9 +54,6 @@ def search_runbook(query: str, limit: int = 3) -> str:
         return "\n\n---\n\n".join(blocks) if blocks else "Sin runbooks relevantes encontrados."
     except Exception as e:
         return f"Error al buscar runbooks: {e}"
-    finally:
-        if client:
-            client.close()
 
 
 @tool
@@ -82,7 +78,6 @@ def search_similar_incidents(query: str, limit: int = 3) -> str:
     from weaviate.classes.query import HybridFusion, MetadataQuery
     from app.services.incident import get_embedding_local
 
-    client = None
     try:
         client = get_weaviate_client()
         incidents_collection = client.collections.get("Incident")
@@ -116,9 +111,6 @@ def search_similar_incidents(query: str, limit: int = 3) -> str:
         return "\n\n---\n\n".join(blocks)
     except Exception as e:
         return f"Error buscando incidentes similares: {e}"
-    finally:
-        if client:
-            client.close()
 
 
 @tool
