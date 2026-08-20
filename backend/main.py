@@ -22,6 +22,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"ADVERTENCIA: No se pudo conectar con Weaviate al arrancar: {e}")
     
+    # Iniciar auto-scrape en background
+    try:
+        from app.services.auto_scrape import start_auto_scrape_background
+        start_auto_scrape_background()
+    except Exception as e:
+        print(f"ADVERTENCIA: No se pudo iniciar auto-scrape: {e}")
+    
     yield  # La aplicación se ejecuta normalmente aquí
     
     # Evento de apagado

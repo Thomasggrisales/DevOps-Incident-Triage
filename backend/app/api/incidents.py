@@ -380,3 +380,42 @@ def submit_approval(
         "incident_id": incident.id,
         "status": incident.status,
     } 
+
+
+# --- Auto-scrape endpoints ---
+
+@router.get("/scrape/status")
+def get_scrape_status():
+    """Devuelve el estado de la configuración de auto-scrape."""
+    from app.services.auto_scrape import get_auto_scrape_config
+    return get_auto_scrape_config()
+
+
+@router.post("/scrape/run")
+def run_scrape(
+    force: bool = Query(False, description="Forzar re-indexación completa"),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Ejecuta un scrape manual de todas las fuentes configuradas."""
+    from app.services.auto_scrape import run_auto_scrape, is_auto_scrape_running
+    
+    if is_auto_scrape_running():
+        raise HTTPException(
+            status_code=409,
+            detail="Ya hay un scrape en ejecución. Espera a que termine."
+        )
+    
+    # Ejecutar en background para no bloquear la respuesta
+    import threading
+    thread = threading.Thread(
+        target=run_auto_scrape,
+        args=(force,),
+        daemon=True,
+    )
+    thread.start()
+    
+    return {
+        "status": "started",
+        "force": force,
+        "message": "Scrape iniciado en background. Consulta /scrape/status para ver el progreso.",
+    }
