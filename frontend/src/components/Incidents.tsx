@@ -60,7 +60,9 @@ export default function Incidents() {
   const [error, setError] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [search, setSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
   const navigate = useNavigate();
+  const ITEMS_PER_PAGE = 20;
 
   const getIncidents = async (): Promise<Incident[]> => {
     const response = await apiFetch('/incidents/');
@@ -109,12 +111,28 @@ export default function Incidents() {
     navigate('/login');
   };
 
+  const handleFilterChange = (status: string) => {
+    setFilterStatus(status);
+    setCurrentPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setCurrentPage(1);
+  };
+
   const filtered = incidents
     .filter((inc) => filterStatus === 'all' || inc.status === filterStatus)
     .filter((inc) => {
       const term = search.trim().toLowerCase();
       return !term || inc.title.toLowerCase().includes(term) || String(inc.id).includes(term);
     });
+
+  const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE);
+  const paginatedIncidents = filtered.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   const activeCount = incidents.filter((inc) => inc.status === 'open' || inc.status === 'investigating').length;
   const resolvedCount = incidents.filter((inc) => inc.status === 'resolved').length;
@@ -208,7 +226,7 @@ export default function Incidents() {
           <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
               <button
-                onClick={() => setFilterStatus('all')}
+                onClick={() => handleFilterChange('all')}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                   filterStatus === 'all'
                     ? 'bg-blue-600/30 text-blue-300'
@@ -220,7 +238,7 @@ export default function Incidents() {
               {STATUS_ORDER.map((status) => (
                 <button
                   key={status}
-                  onClick={() => setFilterStatus(status)}
+                  onClick={() => handleFilterChange(status)}
                   className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
                     filterStatus === status
                       ? 'bg-blue-600/30 text-blue-300'
@@ -236,7 +254,7 @@ export default function Incidents() {
               type="text"
               placeholder="Buscar por título o ID…"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="w-full rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/50 md:w-72"
             />
           </div>
@@ -255,7 +273,7 @@ export default function Incidents() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((inc) => (
+                {paginatedIncidents.map((inc) => (
                   <tr key={inc.id} className="border-b border-white/5 transition-colors last:border-0 hover:bg-white/5">
                     <td className="px-6 py-3 text-gray-400">#{inc.id}</td>
                     <td className="max-w-[340px] truncate px-4 py-3 text-gray-200">{inc.title}</td>
@@ -283,6 +301,62 @@ export default function Incidents() {
               </tbody>
             </table>
           </div>
+
+          {/* Paginación */}
+          {totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between">
+              <p className="text-sm text-gray-400">
+                Mostrando {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, filtered.length)} de {filtered.length} incidentes
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Anterior
+                </button>
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter((page) => {
+                    if (totalPages <= 7) return true;
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - currentPage) <= 1) return true;
+                    return false;
+                  })
+                  .reduce<(number | string)[]>((acc, page, i, arr) => {
+                    if (i > 0 && (arr[i - 1] as number) + 1 !== page) {
+                      acc.push('...');
+                    }
+                    acc.push(page);
+                    return acc;
+                  }, [])
+                  .map((page, i) =>
+                    typeof page === 'string' ? (
+                      <span key={`ellipsis-${i}`} className="px-2 text-gray-500">…</span>
+                    ) : (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                          currentPage === page
+                            ? 'bg-blue-600/30 text-blue-300'
+                            : 'text-gray-400 hover:bg-white/10 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
+                <button
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="rounded-lg border border-white/10 px-3 py-1.5 text-sm text-gray-300 transition-colors hover:bg-white/10 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Siguiente
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
