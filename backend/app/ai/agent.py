@@ -197,7 +197,13 @@ def classify(state: IncidentState) -> dict:
         f"Descripción: {incident.get('description')}\nFuente: {incident.get('source')}\n\n"
         f"Contexto de la conversación:\n{_conversation_context(state)}\n\n"
         f"Último mensaje del ingeniero: {user_text}\n\n"
-        f"Servicios disponibles: {tools.available_service_hint()}"
+        f"Servicios disponibles: {tools.available_service_hint()}\n\n"
+        "Mapeo de nombres comunes:\n"
+        "- 'backend' / 'api' / 'servidor' → 'api-gateway' o 'auth-service'\n"
+        "- 'bd' / 'base de datos' / 'postgres' → 'database'\n"
+        "- 'cache' / 'redis' → 'cache'\n"
+        "- 'frontend' / 'ui' → 'frontend'\n"
+        "- 'worker' / 'job' / 'tarea' → 'worker'"
     )
 
     data = _parse_json(_chat(system, prompt))
